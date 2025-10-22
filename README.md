@@ -12,11 +12,12 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
 ### 🔐 Authentication & Security
 
 - **Multiple Authentication Strategies**:
-  - Local email/password authentication
+  - Local email/password authentication with email verification
   - OAuth2 (Google, GitHub, Microsoft)
   - Keycloak integration for enterprise SSO
   - API key authentication for programmatic access
   - **Two-Factor Authentication (2FA/TOTP)** with QR code generation and backup codes
+- **Email Verification & Password Reset** - Secure token-based flows with expiration
 - **Session Management** - Device tracking, IP address logging, "logout from all devices"
 - **JWT Tokens** - Secure access and refresh tokens with automatic rotation
 - **Password Security** - Bcrypt hashing with strength validation and configurable policies
@@ -29,6 +30,11 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
 - **Role-Based Access Control (RBAC)** - Dynamic permissions system
 - **Invitation System** - Secure organization invites with expiration
 - **Scoped Resources** - Complete data isolation per tenant
+- **Usage Quotas** - Per-organization limits for users, storage, API calls, and file uploads
+  - Automatic quota tracking and enforcement
+  - Monthly/daily quota resets
+  - Usage analytics and reporting
+  - Prevent abuse with configurable limits
 
 ### 📁 File Storage & Management
 
@@ -42,7 +48,13 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
 ### ⚡ Real-Time & Background Processing
 
 - **WebSocket Support** - Real-time bi-directional communication with JWT authentication
+- **Webhooks System** - Event-driven integrations with external services
+  - 13 event types (user.*, file.*, organization.*, api_key.*, session.*)
+  - HMAC signature verification (SHA256)
+  - Automatic retry with exponential backoff
+  - Delivery tracking and analytics
 - **Celery Workers** - Distributed task queue for async operations
+- **Dead Letter Queue (DLQ)** - Failed task management with retry/resolve workflows
 - **Celery Beat** - Scheduled task execution (cron-like)
 - **Flower Dashboard** - Real-time task monitoring and management
 - **Redis Caching** - High-performance caching with decorator pattern
@@ -65,6 +77,11 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
   - Redis (Bitnami)
   - MinIO (Bitnami)
 - **TLS/SSL Support** - Automated certificate management with cert-manager and Let's Encrypt
+- **Graceful Shutdown** - Production-safe deployments with:
+  - SIGTERM/SIGINT signal handling
+  - Active request tracking
+  - Configurable timeout (default 30s)
+  - Automatic cleanup callbacks
 
 ### 🔧 Developer Experience
 
@@ -77,9 +94,17 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
 - **Repository Pattern** - Clean separation of data access and business logic
 - **Pagination Utilities** - Standardized cursor and offset pagination
 - **Request Tracing** - X-Request-ID for distributed tracing
+- **Database Optimization** - Strategic indexes on frequently queried fields
 
-### 🔌 Integrations
+### 🔌 Integrations & Monitoring
 
+- **Prometheus Metrics** - Production-grade observability with `/metrics` endpoint
+- **Enhanced Health Checks** - Comprehensive service monitoring:
+  - Database connectivity and query performance
+  - Redis connection and read/write operations
+  - Celery worker status and task counts
+  - Storage service availability
+  - Aggregate health status endpoint
 - **OpenAI API** - LLM provider abstraction (OpenAI, Azure OpenAI, custom endpoints)
 - **Email System** - Async email with templates (verification, password reset, notifications)
 - **Notification System** - In-app notifications with read/unread tracking
@@ -172,6 +197,10 @@ celery -A app.tasks.celery_app flower
 │   │           ├── files.py         # File upload/management
 │   │           ├── users.py         # User management
 │   │           ├── organizations.py # Multi-tenancy
+│   │           ├── quota.py         # Usage quotas
+│   │           ├── webhooks.py      # Webhook management
+│   │           ├── dead_letter.py   # DLQ monitoring
+│   │           ├── health.py        # Health checks
 │   │           └── websocket.py     # Real-time connections
 │   ├── core/                        # Core configuration
 │   │   ├── config.py               # Settings management
@@ -182,7 +211,8 @@ celery -A app.tasks.celery_app flower
 │   ├── middleware/                  # Custom middleware
 │   │   ├── request_id.py           # Request tracing
 │   │   ├── security.py             # Security headers
-│   │   └── rate_limit.py           # Rate limiting
+│   │   ├── rate_limit.py           # Rate limiting
+│   │   └── graceful_shutdown.py    # Graceful shutdown tracking
 │   ├── models/                      # SQLAlchemy models
 │   │   ├── user.py                 # User model
 │   │   ├── totp.py                 # 2FA secrets
@@ -192,7 +222,11 @@ celery -A app.tasks.celery_app flower
 │   │   ├── role.py                 # RBAC
 │   │   ├── notification.py         # Notifications
 │   │   ├── invitation.py           # Invitations
-│   │   └── feature_flag.py         # Feature flags
+│   │   ├── feature_flag.py         # Feature flags
+│   │   ├── token.py                # Email/password reset tokens
+│   │   ├── quota.py                # Usage quotas
+│   │   ├── webhook.py              # Webhooks
+│   │   └── dead_letter.py          # DLQ tasks
 │   ├── repositories/                # Data access layer
 │   │   ├── base.py                 # Generic CRUD
 │   │   └── user_repository.py      # User-specific queries
@@ -205,10 +239,15 @@ celery -A app.tasks.celery_app flower
 │   │   ├── cache.py                # Redis caching
 │   │   ├── rbac.py                 # Permissions
 │   │   ├── feature_flag.py         # Feature flags
+│   │   ├── quota.py                # Usage quota management
+│   │   ├── webhook.py              # Webhook delivery
+│   │   ├── dead_letter.py          # DLQ management
 │   │   └── websocket_manager.py    # WebSocket connections
 │   ├── tasks/                       # Celery tasks
-│   │   ├── celery_app.py           # Celery config
+│   │   ├── celery_app.py           # Celery config + DLQ
+│   │   ├── task_utils.py           # Task base classes
 │   │   ├── email.py                # Email tasks
+│   │   ├── webhook.py              # Webhook delivery tasks
 │   │   └── pypi_check.py           # Dependency monitoring
 │   ├── utils/                       # Utilities
 │   │   ├── pagination.py           # Pagination helpers
@@ -252,10 +291,14 @@ celery -A app.tasks.celery_app flower
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/v1/auth/register` | Register new user |
+| `POST` | `/api/v1/auth/register` | Register new user (sends verification email) |
 | `POST` | `/api/v1/auth/login` | Login with credentials |
 | `POST` | `/api/v1/auth/refresh` | Refresh access token |
 | `GET` | `/api/v1/auth/me` | Get current user |
+| `POST` | `/api/v1/auth/verify-email` | Verify email address with token |
+| `POST` | `/api/v1/auth/resend-verification` | Resend verification email |
+| `POST` | `/api/v1/auth/request-password-reset` | Request password reset email |
+| `POST` | `/api/v1/auth/reset-password` | Reset password with token |
 | `GET` | `/api/v1/auth/oauth/{provider}/authorize` | OAuth authorization |
 | `POST` | `/api/v1/auth/oauth/{provider}/callback` | OAuth callback |
 | `POST` | `/api/v1/auth/keycloak/callback` | Keycloak authentication |
@@ -319,13 +362,50 @@ celery -A app.tasks.celery_app flower
 |----------|----------|-------------|
 | `WS` | `/api/v1/ws` | WebSocket connection (JWT auth) |
 
+### Usage Quotas
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/quota/status` | Get organization quota status |
+| `PUT` | `/api/v1/quota/limits` | Update quota limits (admin) |
+| `GET` | `/api/v1/quota/usage-logs` | Get usage history (paginated) |
+
+### Webhooks
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/webhooks/events` | List available event types |
+| `POST` | `/api/v1/webhooks` | Create webhook |
+| `GET` | `/api/v1/webhooks` | List webhooks |
+| `GET` | `/api/v1/webhooks/{id}` | Get webhook details |
+| `PUT` | `/api/v1/webhooks/{id}` | Update webhook |
+| `DELETE` | `/api/v1/webhooks/{id}` | Delete webhook |
+| `POST` | `/api/v1/webhooks/{id}/test` | Test webhook delivery |
+| `GET` | `/api/v1/webhooks/{id}/deliveries` | Get delivery history |
+
+### Dead Letter Queue (DLQ)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/dead-letter/statistics` | Get DLQ statistics |
+| `GET` | `/api/v1/dead-letter` | List failed tasks |
+| `GET` | `/api/v1/dead-letter/{task_id}` | Get task details |
+| `POST` | `/api/v1/dead-letter/{task_id}/resolve` | Mark task as resolved |
+| `POST` | `/api/v1/dead-letter/{task_id}/retry` | Retry failed task |
+| `POST` | `/api/v1/dead-letter/{task_id}/ignore` | Ignore task |
+
 ### Health & Monitoring
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/health` | Basic health check |
+| `GET` | `/metrics` | Prometheus metrics |
 | `GET` | `/api/v1/health` | Detailed health check |
 | `GET` | `/api/v1/health/db` | Database health check |
+| `GET` | `/api/v1/health/redis` | Redis health check |
+| `GET` | `/api/v1/health/celery` | Celery workers health check |
+| `GET` | `/api/v1/health/storage` | Storage service health check |
+| `GET` | `/api/v1/health/all` | Aggregate health check |
 
 Full API documentation available at: `http://localhost:8000/docs`
 
@@ -601,12 +681,17 @@ asyncio.run(test_websocket())
 - `User` - User accounts with multi-auth support
 - `TOTPSecret` - Two-factor authentication secrets and backup codes
 - `UserSession` - Session tracking with device fingerprinting
+- `PasswordResetToken` & `EmailVerificationToken` - Token-based email flows
 - `File` - File metadata and storage references
-- `Organization` - Top-level tenants
+- `Organization` - Top-level tenants with quota relationships
+- `OrganizationQuota` - Usage limits and tracking (users, storage, API calls, uploads)
+- `UsageLog` - Detailed usage analytics per organization
 - `Team` - Sub-groups within organizations
 - `Role` & `Permission` - RBAC implementation
 - `OAuthAccount` - Social authentication linkage
 - `APIKey` - Programmatic access tokens
+- `Webhook` & `WebhookDelivery` - Event notification system
+- `DeadLetterTask` - Failed task tracking and management
 - `AuditLog` - Security and compliance logging
 - `Notification` - In-app notification system
 - `Invitation` - Organization invitation system
@@ -620,6 +705,9 @@ asyncio.run(test_websocket())
 - `FileStorageService` - File upload/download with S3/local providers
 - `CacheService` - Redis caching with decorator pattern
 - `RBACService` - Role and permission management
+- `QuotaService` - Usage quota management and enforcement
+- `WebhookService` - Webhook delivery with HMAC signatures
+- `DeadLetterService` - Failed task management
 - `WebSocketManager` - Real-time connection management
 - `FeatureFlagService` - Feature flag evaluation
 - `LLMService` - OpenAI/LLM integration
@@ -627,9 +715,11 @@ asyncio.run(test_websocket())
 ### Background Tasks (Celery)
 
 - Email sending (verification, password reset, notifications)
+- Webhook delivery with retry logic
 - PyPI version checking
 - Session cleanup
 - File processing
+- Failed task DLQ management
 - Custom async operations
 
 ### Deployment Targets
