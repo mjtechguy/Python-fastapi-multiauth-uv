@@ -16,6 +16,7 @@ from app.models.notification import Notification
 from app.models.invitation import Invitation
 from app.models.feature_flag import FeatureFlag
 from app.models.file import File
+from app.models.token import PasswordResetToken, EmailVerificationToken
 
 __all__ = [
     "Base",
@@ -34,4 +35,6 @@ __all__ = [
     "Invitation",
     "FeatureFlag",
     "File",
+    "PasswordResetToken",
+    "EmailVerificationToken",
 ]

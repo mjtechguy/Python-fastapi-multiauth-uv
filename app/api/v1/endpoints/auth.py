@@ -17,6 +17,16 @@ from app.schemas.auth import (
     OAuthURLResponse,
 )
 from app.schemas.user import UserCreate, UserResponse
+from app.schemas.token import (
+    RequestPasswordResetRequest,
+    RequestPasswordResetResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+    VerifyEmailRequest,
+    VerifyEmailResponse,
+    ResendVerificationRequest,
+    ResendVerificationResponse,
+)
 from app.services.auth import AuthService
 from app.services.user import UserService
 
@@ -61,9 +71,21 @@ async def register(
     user = await UserService.create(db, user_in)
     await db.commit()
 
-    # TODO: Send verification email
-    # from app.tasks.email import send_verification_email
-    # send_verification_email.delay(user.email, verification_token)
+    # Create email verification token and send email
+    from app.models.token import EmailVerificationToken
+    from app.tasks.email import send_verification_email
+
+    token = EmailVerificationToken.generate_token()
+    verification_token = EmailVerificationToken(
+        user_id=user.id,
+        token=token,
+        expires_at=EmailVerificationToken.get_expiration(),
+    )
+    db.add(verification_token)
+    await db.commit()
+
+    # Send verification email asynchronously
+    send_verification_email.delay(user.email, token)
 
     return user
 
@@ -233,3 +255,200 @@ async def keycloak_callback(
         )
 
     return token
+
+
+@router.post("/request-password-reset", response_model=RequestPasswordResetResponse)
+async def request_password_reset(
+    request: RequestPasswordResetRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> RequestPasswordResetResponse:
+    """
+    Request password reset email.
+
+    Sends a password reset link to the user's email if the account exists.
+    Always returns success to prevent email enumeration.
+
+    Args:
+        request: Password reset request with email
+        db: Database session
+
+    Returns:
+        Success message
+    """
+    from datetime import datetime
+    from sqlalchemy import select
+    from app.models.token import PasswordResetToken
+    from app.tasks.email import send_password_reset_email
+
+    # Get user by email
+    user = await UserService.get_by_email(db, request.email)
+
+    if user:
+        # Create reset token
+        token = PasswordResetToken.generate_token()
+        reset_token = PasswordResetToken(
+            user_id=user.id,
+            token=token,
+            expires_at=PasswordResetToken.get_expiration(),
+        )
+        db.add(reset_token)
+        await db.commit()
+
+        # Send email asynchronously
+        send_password_reset_email.delay(user.email, token)
+
+    # Always return success (prevent email enumeration)
+    return RequestPasswordResetResponse(
+        message="If an account with that email exists, a password reset link has been sent.",
+        email=request.email,
+    )
+
+
+@router.post("/reset-password", response_model=ResetPasswordResponse)
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ResetPasswordResponse:
+    """
+    Reset password using token.
+
+    Args:
+        request: Reset password request with token and new password
+        db: Database session
+
+    Returns:
+        Success message
+
+    Raises:
+        HTTPException: If token is invalid or expired
+    """
+    from sqlalchemy import select
+    from app.models.token import PasswordResetToken
+    from app.core.security import get_password_hash
+
+    # Find token
+    result = await db.execute(
+        select(PasswordResetToken).where(PasswordResetToken.token == request.token)
+    )
+    reset_token = result.scalar_one_or_none()
+
+    if not reset_token or not reset_token.is_valid():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    # Get user
+    user = await UserService.get_by_id(db, reset_token.user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Update password
+    user.hashed_password = get_password_hash(request.new_password)
+    user.failed_login_attempts = 0
+    user.locked_until = None
+
+    # Mark token as used
+    reset_token.used = True
+
+    await db.commit()
+
+    return ResetPasswordResponse(message="Password has been reset successfully")
+
+
+@router.post("/verify-email", response_model=VerifyEmailResponse)
+async def verify_email(
+    request: VerifyEmailRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> VerifyEmailResponse:
+    """
+    Verify email address using token.
+
+    Args:
+        request: Email verification request with token
+        db: Database session
+
+    Returns:
+        Success message
+
+    Raises:
+        HTTPException: If token is invalid or expired
+    """
+    from sqlalchemy import select
+    from app.models.token import EmailVerificationToken
+
+    # Find token
+    result = await db.execute(
+        select(EmailVerificationToken).where(EmailVerificationToken.token == request.token)
+    )
+    verification_token = result.scalar_one_or_none()
+
+    if not verification_token or not verification_token.is_valid():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token",
+        )
+
+    # Get user
+    user = await UserService.get_by_id(db, verification_token.user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Mark user as verified
+    user.is_verified = True
+
+    # Mark token as used
+    verification_token.used = True
+
+    await db.commit()
+
+    return VerifyEmailResponse(message="Email has been verified successfully")
+
+
+@router.post("/resend-verification", response_model=ResendVerificationResponse)
+async def resend_verification(
+    request: ResendVerificationRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ResendVerificationResponse:
+    """
+    Resend email verification link.
+
+    Args:
+        request: Resend verification request with email
+        db: Database session
+
+    Returns:
+        Success message
+    """
+    from sqlalchemy import select
+    from app.models.token import EmailVerificationToken
+    from app.tasks.email import send_verification_email
+
+    # Get user by email
+    user = await UserService.get_by_email(db, request.email)
+
+    if user and not user.is_verified:
+        # Create verification token
+        token = EmailVerificationToken.generate_token()
+        verification_token = EmailVerificationToken(
+            user_id=user.id,
+            token=token,
+            expires_at=EmailVerificationToken.get_expiration(),
+        )
+        db.add(verification_token)
+        await db.commit()
+
+        # Send email asynchronously
+        send_verification_email.delay(user.email, token)
+
+    # Always return success (prevent email enumeration)
+    return ResendVerificationResponse(
+        message="If an account with that email exists and is unverified, a verification link has been sent.",
+        email=request.email,
+    )

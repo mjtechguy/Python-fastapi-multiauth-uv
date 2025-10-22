@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from app.models.api_key import APIKey
     from app.models.totp import TOTPSecret
     from app.models.session import UserSession
+    from app.models.token import PasswordResetToken, EmailVerificationToken
 
 
 # Association table for user-organization membership
@@ -109,6 +110,12 @@ class User(Base):
     )
     sessions: Mapped[list["UserSession"]] = relationship(
         "UserSession", back_populates="user", cascade="all, delete-orphan"
+    )
+    password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(
+        "PasswordResetToken", back_populates="user", cascade="all, delete-orphan"
+    )
+    email_verification_tokens: Mapped[list["EmailVerificationToken"]] = relationship(
+        "EmailVerificationToken", back_populates="user", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

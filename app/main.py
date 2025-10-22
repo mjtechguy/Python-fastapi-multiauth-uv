@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api.v1 import api_router
 from app.core.config import settings
@@ -88,6 +89,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
+# Setup Prometheus metrics
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
 
 @app.get("/")
 async def root() -> dict[str, str]:
@@ -96,6 +100,7 @@ async def root() -> dict[str, str]:
         "message": f"Welcome to {settings.APP_NAME}",
         "version": "0.1.0",
         "docs": "/docs",
+        "metrics": "/metrics",
         "environment": settings.APP_ENV,
     }
 
