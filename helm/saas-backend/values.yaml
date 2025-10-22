@@ -205,16 +205,68 @@ readinessProbe:
   timeoutSeconds: 3
   failureThreshold: 3
 
-# PostgreSQL (if deploying with the chart)
+# PostgreSQL subchart configuration
+# Set enabled: true to deploy PostgreSQL with the chart
+# Otherwise, use external PostgreSQL instance
 postgresql:
   enabled: false
   auth:
     username: postgres
     password: postgres
     database: saas_db
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
 
-# Redis (if deploying with the chart)
+# Redis subchart configuration
+# Set enabled: true to deploy Redis with the chart
+# Otherwise, use external Redis instance
 redis:
   enabled: false
   auth:
     enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# MinIO subchart configuration
+# Set enabled: true to deploy MinIO with the chart
+# Otherwise, use external S3 or MinIO instance
+minio:
+  enabled: false
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin
+  defaultBuckets: "saas-uploads"
+  mode: standalone
+  persistence:
+    enabled: true
+    size: 10Gi
+  service:
+    type: ClusterIP
+    ports:
+      api: 9000
+      console: 9001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi

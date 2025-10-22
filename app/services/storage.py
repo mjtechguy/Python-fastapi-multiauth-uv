@@ -78,15 +78,24 @@ class S3StorageService(StorageService):
         aws_access_key_id: str | None = None,
         aws_secret_access_key: str | None = None,
         region_name: str = "us-east-1",
+        endpoint_url: str | None = None,
     ):
         """Initialize S3 storage service."""
         self.bucket_name = bucket_name
-        self.s3_client = boto3.client(
-            "s3",
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
-            region_name=region_name,
-        )
+
+        # Build boto3 client kwargs
+        client_kwargs = {
+            "service_name": "s3",
+            "aws_access_key_id": aws_access_key_id,
+            "aws_secret_access_key": aws_secret_access_key,
+            "region_name": region_name,
+        }
+
+        # Add endpoint URL for MinIO or other S3-compatible services
+        if endpoint_url:
+            client_kwargs["endpoint_url"] = endpoint_url
+
+        self.s3_client = boto3.client(**client_kwargs)
 
     async def upload(
         self, file: BinaryIO, filename: str, content_type: str
@@ -215,6 +224,7 @@ class FileStorageService:
             aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
             aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
             aws_region = os.getenv("AWS_REGION", "us-east-1")
+            endpoint_url = os.getenv("AWS_ENDPOINT_URL")  # For MinIO or other S3-compatible services
 
             if not bucket_name:
                 raise ValueError("AWS_S3_BUCKET environment variable not set")
@@ -224,6 +234,7 @@ class FileStorageService:
                 aws_access_key_id=aws_access_key,
                 aws_secret_access_key=aws_secret_key,
                 region_name=aws_region,
+                endpoint_url=endpoint_url,
             )
         else:
             upload_dir = os.getenv("LOCAL_UPLOAD_DIR", "uploads")

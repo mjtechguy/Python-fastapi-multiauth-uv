@@ -27,11 +27,9 @@ from app.schemas.file import (
     FileDownloadResponse,
 )
 from app.services.storage import storage_service
+from app.core.config import settings
 
 router = APIRouter(prefix="/files", tags=["files"])
-
-# Configuration
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
 ALLOWED_DOCUMENT_TYPES = [
     "application/pdf",
@@ -49,16 +47,17 @@ async def upload_file(
     """
     Upload a file.
 
-    Supports images and documents up to 50MB.
+    Supports images and documents up to configured size limit.
     """
     # Validate file size
     content = await file.read()
     file_size = len(content)
+    max_file_size = settings.MAX_FILE_SIZE_MB * 1024 * 1024
 
-    if not storage_service.validate_file_size(file_size, MAX_FILE_SIZE):
+    if not storage_service.validate_file_size(file_size, max_file_size):
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE / (1024*1024)}MB",
+            detail=f"File size exceeds maximum allowed size of {settings.MAX_FILE_SIZE_MB}MB",
         )
 
     # Validate file type

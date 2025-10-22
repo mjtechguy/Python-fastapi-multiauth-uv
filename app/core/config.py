@@ -112,6 +112,16 @@ class Settings(BaseSettings):
     PYPI_CHECK_ENABLED: bool = True
     PYPI_CHECK_INTERVAL_HOURS: int = 24
 
+    # File Storage
+    FILE_STORAGE_PROVIDER: Literal["local", "s3"] = "local"
+    LOCAL_UPLOAD_DIR: str = "uploads"
+    MAX_FILE_SIZE_MB: int = 50
+    AWS_S3_BUCKET: str = ""
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_REGION: str = "us-east-1"
+    AWS_ENDPOINT_URL: str = ""  # For MinIO or other S3-compatible services
+
     @property
     def is_production(self) -> bool:
         """Check if running in production environment."""
