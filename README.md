@@ -1,237 +1,339 @@
 # SaaS Backend Framework
 
-A production-grade, scalable FastAPI backend framework designed for enterprise SaaS applications with comprehensive authentication, authorization, and multi-tenancy support.
+A **production-grade**, **enterprise-ready** FastAPI backend framework designed for scalable SaaS applications with comprehensive authentication, multi-tenancy, real-time features, and cloud-native deployment support.
 
-## Features
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-blue.svg)](https://www.postgresql.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-### Core Features
-- **FastAPI** - Modern, fast web framework with automatic API documentation
-- **UV Package Manager** - Ultra-fast Python package management
-- **PostgreSQL** - Robust relational database with async support
-- **Redis** - High-performance caching and message broker
-- **Celery + Flower** - Distributed task queue with monitoring
+## ✨ Features
 
-### Authentication & Authorization
-- **Multiple Auth Strategies**:
+### 🔐 Authentication & Security
+
+- **Multiple Authentication Strategies**:
   - Local email/password authentication
   - OAuth2 (Google, GitHub, Microsoft)
-  - Keycloak integration
-  - API key authentication
-- **JWT Tokens** - Secure access and refresh tokens
-- **Password Security** - Bcrypt hashing with strength validation
-- **Account Security** - Failed login tracking and account lockout
+  - Keycloak integration for enterprise SSO
+  - API key authentication for programmatic access
+  - **Two-Factor Authentication (2FA/TOTP)** with QR code generation and backup codes
+- **Session Management** - Device tracking, IP address logging, "logout from all devices"
+- **JWT Tokens** - Secure access and refresh tokens with automatic rotation
+- **Password Security** - Bcrypt hashing with strength validation and configurable policies
+- **Account Protection** - Failed login tracking, automatic lockout, and session timeout
 
-### RBAC (Role-Based Access Control)
-- Fine-grained permissions system
-- Dynamic role creation and assignment
-- Organization and team-scoped permissions
-- System-defined and custom roles
+### 👥 Multi-Tenancy & RBAC
 
-### Multi-Tenancy
-- **Organizations** - Top-level tenant isolation
-- **Teams** - Sub-groups within organizations
-- **Member Management** - User-organization-team relationships
-- **Scoped Resources** - Data isolation per tenant
+- **Organizations** - Top-level tenant isolation with member management
+- **Teams** - Sub-groups within organizations for fine-grained access control
+- **Role-Based Access Control (RBAC)** - Dynamic permissions system
+- **Invitation System** - Secure organization invites with expiration
+- **Scoped Resources** - Complete data isolation per tenant
 
-### Security
-- Security headers middleware
-- Rate limiting
-- CORS configuration
-- Audit logging
-- Password policies
-- Session management
+### 📁 File Storage & Management
 
-### Developer Experience
-- **Type Safety** - Full type hints with Mypy
-- **Code Quality** - Black, Ruff linting
-- **Testing** - Pytest with async support
-- **Database Migrations** - Alembic
+- **Flexible Storage** - S3-compatible storage (AWS S3, MinIO, DigitalOcean Spaces)
+- **File Upload** - Configurable size limits (default 50MB, adjustable via `.env`)
+- **Image Optimization** - Automatic resizing and compression
+- **Presigned URLs** - Secure, temporary download links
+- **Checksum Validation** - SHA256 integrity verification
+- **Metadata Tracking** - File size, type, owner, upload timestamp
+
+### ⚡ Real-Time & Background Processing
+
+- **WebSocket Support** - Real-time bi-directional communication with JWT authentication
+- **Celery Workers** - Distributed task queue for async operations
+- **Celery Beat** - Scheduled task execution (cron-like)
+- **Flower Dashboard** - Real-time task monitoring and management
+- **Redis Caching** - High-performance caching with decorator pattern
+- **Feature Flags** - Gradual rollout and A/B testing capabilities
+
+### 🚀 Cloud-Native Deployment
+
+- **Docker & Docker Compose** - Complete containerized development environment
+  - PostgreSQL with Adminer UI
+  - Redis for caching and message broker
+  - MinIO for S3-compatible local storage
+  - All application services (API, workers, beat, flower)
+- **Kubernetes Ready** - Production-grade K8s manifests with:
+  - Horizontal Pod Autoscaler (HPA)
+  - Health checks and readiness probes
+  - Resource limits and requests
+  - ConfigMaps and Secrets management
+- **Helm Charts** - Flexible deployment with optional subcharts:
+  - PostgreSQL (Bitnami)
+  - Redis (Bitnami)
+  - MinIO (Bitnami)
+- **TLS/SSL Support** - Automated certificate management with cert-manager and Let's Encrypt
+
+### 🔧 Developer Experience
+
+- **Type Safety** - Full type hints with Pydantic 2.9+
+- **Code Quality** - Black formatting, Ruff linting
+- **Testing** - Pytest with async support and fixtures
+- **Database Migrations** - Alembic with auto-generation
 - **API Documentation** - Auto-generated OpenAPI/Swagger docs
-- **Docker Support** - Complete containerization
+- **Structured Logging** - JSON logs for aggregation and analysis
+- **Repository Pattern** - Clean separation of data access and business logic
+- **Pagination Utilities** - Standardized cursor and offset pagination
+- **Request Tracing** - X-Request-ID for distributed tracing
 
-### Integrations
-- **OpenAI API** - LLM provider abstraction supporting OpenAI and compatible endpoints
-- **Email** - Async email sending with Celery
-- **PyPI Version Checking** - Automated dependency updates monitoring
+### 🔌 Integrations
 
-## Quick Start
+- **OpenAI API** - LLM provider abstraction (OpenAI, Azure OpenAI, custom endpoints)
+- **Email System** - Async email with templates (verification, password reset, notifications)
+- **Notification System** - In-app notifications with read/unread tracking
+- **PyPI Version Checking** - Automated dependency update monitoring
+- **Audit Logging** - Comprehensive security and compliance logging
+
+## 🚀 Quick Start
 
 ### Prerequisites
+
 - Python 3.12+
-- PostgreSQL 16+
-- Redis 7+
+- Docker & Docker Compose
 - UV package manager
 
-### Installation
+### Option 1: Docker Compose (Recommended for Development)
 
-1. **Clone the repository**
+The fastest way to get started - includes **all services** (PostgreSQL, Redis, MinIO, Adminer):
+
 ```bash
+# 1. Clone the repository
 git clone <repository-url>
 cd Python-fastapi-multiauth-uv
+
+# 2. Copy environment file
+cp .env.example .env
+# Edit .env if needed (defaults work for local development)
+
+# 3. Start all services
+docker-compose up -d
+
+# 4. Run database migrations
+docker-compose exec api alembic upgrade head
+
+# 5. Access the services
+# API: http://localhost:8000
+# API Docs: http://localhost:8000/docs
+# Adminer (DB UI): http://localhost:8080
+# MinIO Console: http://localhost:9001
+# Flower (Tasks): http://localhost:5555
 ```
 
-2. **Install UV**
+**That's it!** You now have a complete development environment running.
+
+See [DOCKER_COMPOSE.md](DOCKER_COMPOSE.md) for detailed documentation.
+
+### Option 2: Local Development
+
 ```bash
+# 1. Install UV
 curl -LsSf https://astral.sh/uv/install.sh | sh
-```
 
-3. **Install dependencies**
-```bash
-make dev-install
-# or
-uv pip install -r pyproject.toml --extra dev
-```
+# 2. Install dependencies
+uv pip install -e ".[dev]"
 
-4. **Set up environment variables**
-```bash
+# 3. Start infrastructure services
+docker-compose up -d postgres redis
+
+# 4. Set up environment
 cp .env.example .env
 # Edit .env with your configuration
-```
 
-5. **Start services with Docker**
-```bash
-make docker-up
-# or
-docker-compose up -d
-```
-
-6. **Run database migrations**
-```bash
-make migrate
-# or
+# 5. Run migrations
 alembic upgrade head
-```
 
-7. **Run the application**
-```bash
-make run
-# or
+# 6. Start the API
 uvicorn app.main:app --reload
+
+# 7. Start Celery worker (in another terminal)
+celery -A app.tasks.celery_app worker --loglevel=info
+
+# 8. Start Celery beat (in another terminal)
+celery -A app.tasks.celery_app beat --loglevel=info
+
+# 9. Start Flower (optional, for monitoring)
+celery -A app.tasks.celery_app flower
 ```
 
-The API will be available at `http://localhost:8000`
-
-- **API Documentation**: `http://localhost:8000/docs`
-- **ReDoc**: `http://localhost:8000/redoc`
-- **Flower (Celery Monitor)**: `http://localhost:5555`
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 .
 ├── app/
 │   ├── api/
 │   │   └── v1/
-│   │       ├── dependencies/    # Dependency injection
-│   │       └── endpoints/       # API routes
-│   ├── core/                    # Core configuration
-│   ├── db/                      # Database configuration
-│   ├── middleware/              # Custom middleware
-│   ├── models/                  # SQLAlchemy models
-│   ├── schemas/                 # Pydantic schemas
-│   ├── services/                # Business logic
-│   ├── tasks/                   # Celery tasks
-│   ├── utils/                   # Utilities
-│   └── main.py                  # Application entry point
-├── alembic/                     # Database migrations
-├── tests/                       # Test suite
-│   ├── unit/                    # Unit tests
-│   ├── integration/             # Integration tests
-│   └── e2e/                     # End-to-end tests
-├── scripts/                     # Utility scripts
-├── docker-compose.yml           # Docker orchestration
-├── Dockerfile                   # Container definition
-├── pyproject.toml              # Project dependencies
-└── Makefile                    # Development commands
+│   │       ├── dependencies/        # Dependency injection
+│   │       └── endpoints/           # API routes
+│   │           ├── auth.py          # Authentication
+│   │           ├── totp.py          # 2FA/TOTP
+│   │           ├── sessions.py      # Session management
+│   │           ├── files.py         # File upload/management
+│   │           ├── users.py         # User management
+│   │           ├── organizations.py # Multi-tenancy
+│   │           └── websocket.py     # Real-time connections
+│   ├── core/                        # Core configuration
+│   │   ├── config.py               # Settings management
+│   │   └── security.py             # Security utilities
+│   ├── db/                          # Database configuration
+│   │   ├── base.py                 # Model registry
+│   │   └── session.py              # Async session
+│   ├── middleware/                  # Custom middleware
+│   │   ├── request_id.py           # Request tracing
+│   │   ├── security.py             # Security headers
+│   │   └── rate_limit.py           # Rate limiting
+│   ├── models/                      # SQLAlchemy models
+│   │   ├── user.py                 # User model
+│   │   ├── totp.py                 # 2FA secrets
+│   │   ├── session.py              # User sessions
+│   │   ├── file.py                 # File metadata
+│   │   ├── organization.py         # Organizations
+│   │   ├── role.py                 # RBAC
+│   │   ├── notification.py         # Notifications
+│   │   ├── invitation.py           # Invitations
+│   │   └── feature_flag.py         # Feature flags
+│   ├── repositories/                # Data access layer
+│   │   ├── base.py                 # Generic CRUD
+│   │   └── user_repository.py      # User-specific queries
+│   ├── schemas/                     # Pydantic schemas
+│   ├── services/                    # Business logic
+│   │   ├── auth.py                 # Authentication
+│   │   ├── totp.py                 # 2FA operations
+│   │   ├── session.py              # Session management
+│   │   ├── storage.py              # File storage (S3/local)
+│   │   ├── cache.py                # Redis caching
+│   │   ├── rbac.py                 # Permissions
+│   │   ├── feature_flag.py         # Feature flags
+│   │   └── websocket_manager.py    # WebSocket connections
+│   ├── tasks/                       # Celery tasks
+│   │   ├── celery_app.py           # Celery config
+│   │   ├── email.py                # Email tasks
+│   │   └── pypi_check.py           # Dependency monitoring
+│   ├── utils/                       # Utilities
+│   │   ├── pagination.py           # Pagination helpers
+│   │   └── filtering.py            # Query filtering
+│   └── main.py                      # Application entry point
+├── alembic/                         # Database migrations
+├── docs/                            # Documentation
+│   ├── ARCHITECTURE.md             # System architecture
+│   ├── API_EXAMPLES.md             # API usage examples
+│   └── TLS_SETUP.md                # TLS configuration
+├── helm/                            # Kubernetes Helm charts
+│   └── saas-backend/
+│       ├── Chart.yaml              # Chart metadata
+│       ├── values.yaml             # Configuration
+│       ├── templates/              # K8s manifests
+│       └── README.md               # Deployment guide
+├── k8s/                             # Kubernetes manifests
+│   ├── namespace.yaml
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   ├── ingress.yaml
+│   ├── hpa.yaml                    # Autoscaling
+│   ├── cert-issuer.yaml            # TLS certs
+│   └── README.md
+├── tests/                           # Test suite
+│   ├── unit/                       # Unit tests
+│   ├── integration/                # Integration tests
+│   └── conftest.py                 # Test fixtures
+├── docker-compose.yml               # Complete dev environment
+├── Dockerfile                       # Container definition
+├── pyproject.toml                  # Dependencies (UV)
+├── .env.example                    # Environment template
+├── DOCKER_COMPOSE.md               # Docker Compose guide
+├── PRODUCTION_READY.md             # Production checklist
+└── README.md                       # This file
 ```
 
-## API Endpoints
+## 📡 API Endpoints
 
-### Authentication
-- `POST /api/v1/auth/register` - Register new user
-- `POST /api/v1/auth/login` - Login with credentials
-- `POST /api/v1/auth/refresh` - Refresh access token
-- `GET /api/v1/auth/me` - Get current user
-- `GET /api/v1/auth/oauth/{provider}/authorize` - OAuth authorization
-- `POST /api/v1/auth/oauth/{provider}/callback` - OAuth callback
-- `POST /api/v1/auth/keycloak/callback` - Keycloak authentication
+### Authentication & Security
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/auth/register` | Register new user |
+| `POST` | `/api/v1/auth/login` | Login with credentials |
+| `POST` | `/api/v1/auth/refresh` | Refresh access token |
+| `GET` | `/api/v1/auth/me` | Get current user |
+| `GET` | `/api/v1/auth/oauth/{provider}/authorize` | OAuth authorization |
+| `POST` | `/api/v1/auth/oauth/{provider}/callback` | OAuth callback |
+| `POST` | `/api/v1/auth/keycloak/callback` | Keycloak authentication |
+
+### Two-Factor Authentication (2FA)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/totp/setup` | Set up 2FA (returns QR code) |
+| `POST` | `/api/v1/totp/enable` | Enable 2FA after verification |
+| `POST` | `/api/v1/totp/verify` | Verify TOTP token during login |
+| `POST` | `/api/v1/totp/disable` | Disable 2FA |
+| `GET` | `/api/v1/totp/status` | Get 2FA status |
+| `POST` | `/api/v1/totp/backup-codes` | Regenerate backup codes |
+
+### Session Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/sessions` | List all active sessions |
+| `GET` | `/api/v1/sessions/stats` | Get session statistics |
+| `DELETE` | `/api/v1/sessions/{id}` | Revoke specific session |
+| `DELETE` | `/api/v1/sessions/all` | Logout from all devices |
+
+### File Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/files/upload` | Upload file (images, documents) |
+| `GET` | `/api/v1/files` | List user's files (paginated) |
+| `GET` | `/api/v1/files/{id}` | Get file metadata |
+| `GET` | `/api/v1/files/{id}/download` | Get presigned download URL |
+| `DELETE` | `/api/v1/files/{id}` | Delete file (soft delete) |
 
 ### Users
-- `GET /api/v1/users/me` - Get current user profile
-- `PUT /api/v1/users/me` - Update current user
-- `PUT /api/v1/users/me/password` - Change password
-- `GET /api/v1/users` - List users (admin)
-- `GET /api/v1/users/{user_id}` - Get user by ID
-- `DELETE /api/v1/users/{user_id}` - Delete user (admin)
 
-### Organizations
-- `POST /api/v1/organizations` - Create organization
-- `GET /api/v1/organizations` - List user's organizations
-- `GET /api/v1/organizations/{org_id}` - Get organization
-- `PUT /api/v1/organizations/{org_id}` - Update organization
-- `DELETE /api/v1/organizations/{org_id}` - Delete organization
-- `POST /api/v1/organizations/{org_id}/members` - Add member
-- `DELETE /api/v1/organizations/{org_id}/members` - Remove member
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/users/me` | Get current user profile |
+| `PUT` | `/api/v1/users/me` | Update current user |
+| `PUT` | `/api/v1/users/me/password` | Change password |
+| `GET` | `/api/v1/users` | List users (admin) |
+| `GET` | `/api/v1/users/{user_id}` | Get user by ID |
+| `DELETE` | `/api/v1/users/{user_id}` | Delete user (admin) |
 
-### Health
-- `GET /health` - Basic health check
-- `GET /api/v1/health` - Detailed health check
-- `GET /api/v1/health/db` - Database health check
+### Organizations (Multi-Tenancy)
 
-## Development
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/organizations` | Create organization |
+| `GET` | `/api/v1/organizations` | List user's organizations |
+| `GET` | `/api/v1/organizations/{org_id}` | Get organization details |
+| `PUT` | `/api/v1/organizations/{org_id}` | Update organization |
+| `DELETE` | `/api/v1/organizations/{org_id}` | Delete organization |
+| `POST` | `/api/v1/organizations/{org_id}/members` | Add member |
+| `DELETE` | `/api/v1/organizations/{org_id}/members/{user_id}` | Remove member |
 
-### Running Tests
-```bash
-make test
-# or
-pytest tests/ -v --cov=app
-```
+### Real-Time (WebSocket)
 
-### Code Formatting
-```bash
-make format
-# or
-black app/ tests/
-ruff check --fix app/ tests/
-```
+| Protocol | Endpoint | Description |
+|----------|----------|-------------|
+| `WS` | `/api/v1/ws` | WebSocket connection (JWT auth) |
 
-### Linting
-```bash
-make lint
-# or
-ruff check app/ tests/
-mypy app/
-```
+### Health & Monitoring
 
-### Security Checks
-```bash
-make security
-# or
-bandit -r app/ -ll
-safety check
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Basic health check |
+| `GET` | `/api/v1/health` | Detailed health check |
+| `GET` | `/api/v1/health/db` | Database health check |
 
-### Database Migrations
+Full API documentation available at: `http://localhost:8000/docs`
 
-Create a new migration:
-```bash
-make revision message="Add new table"
-# or
-alembic revision --autogenerate -m "Add new table"
-```
-
-Apply migrations:
-```bash
-make migrate
-# or
-alembic upgrade head
-```
-
-## Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 
-Key environment variables (see `.env.example` for complete list):
+Key configuration options (see `.env.example` for complete list):
 
 ```env
 # Application
@@ -241,134 +343,359 @@ SECRET_KEY=your-secret-key-min-32-chars
 
 # Database
 DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/db
+DATABASE_POOL_SIZE=20
 
 # Redis
 REDIS_URL=redis://localhost:6379/0
+REDIS_CACHE_DB=1
+
+# Celery
 CELERY_BROKER_URL=redis://localhost:6379/2
+CELERY_RESULT_BACKEND=redis://localhost:6379/3
+
+# File Storage
+FILE_STORAGE_PROVIDER=s3  # or 'local'
+MAX_FILE_SIZE_MB=50
+AWS_S3_BUCKET=your-bucket
+AWS_ACCESS_KEY_ID=your-key
+AWS_SECRET_ACCESS_KEY=your-secret
+AWS_REGION=us-east-1
+AWS_ENDPOINT_URL=http://minio:9000  # For MinIO
 
 # OAuth Providers
 GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-client-secret
+GITHUB_CLIENT_ID=your-client-id
+GITHUB_CLIENT_SECRET=your-client-secret
 
 # OpenAI
 OPENAI_API_KEY=your-api-key
 OPENAI_MODEL=gpt-4-turbo-preview
+
+# Security
+BCRYPT_ROUNDS=12
+PASSWORD_MIN_LENGTH=8
+MAX_LOGIN_ATTEMPTS=5
+RATE_LIMIT_PER_MINUTE=60
 ```
 
-## Deployment
+### Configurable Features
 
-### Docker Deployment
+- **File Upload Size**: Adjust `MAX_FILE_SIZE_MB` in `.env` (no code changes needed)
+- **Rate Limiting**: Configure limits per minute via environment variables
+- **Session Timeout**: Adjustable session expiration
+- **Password Policy**: Minimum length, complexity requirements
+- **CORS Origins**: Comma-separated list of allowed origins
 
-1. Build the image:
-```bash
-docker build -t saas-backend .
-```
+## 🐳 Deployment
 
-2. Run with docker-compose:
+### Development (Docker Compose)
+
+Complete local environment with all services:
+
 ```bash
 docker-compose up -d
 ```
 
+**Services included:**
+- API (FastAPI)
+- PostgreSQL + Adminer UI
+- Redis
+- MinIO + Console
+- Celery Worker
+- Celery Beat
+- Flower
+
+See [DOCKER_COMPOSE.md](DOCKER_COMPOSE.md) for detailed guide.
+
+### Production (Kubernetes)
+
+#### Option 1: Direct Kubernetes Manifests
+
+```bash
+# Create namespace
+kubectl apply -f k8s/namespace.yaml
+
+# Apply configurations
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/secret.yaml  # Edit first!
+
+# Deploy services
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+kubectl apply -f k8s/hpa.yaml
+
+# Set up TLS (cert-manager)
+kubectl apply -f k8s/cert-issuer.yaml
+```
+
+See [k8s/README.md](k8s/README.md) for detailed guide.
+
+#### Option 2: Helm Chart (Recommended)
+
+**With External Services (Production):**
+
+```bash
+helm install saas-backend helm/saas-backend \
+  --namespace saas-prod \
+  --create-namespace \
+  --set secrets.databaseUrl="postgresql://..." \
+  --set secrets.redisUrl="redis://..." \
+  --set secrets.awsS3Bucket="prod-bucket" \
+  --values production-values.yaml
+```
+
+**With Optional Subcharts (Development/Staging):**
+
+```bash
+# Update dependencies (downloads PostgreSQL, Redis, MinIO charts)
+cd helm/saas-backend
+helm dependency update
+
+# Install with all subcharts enabled
+helm install saas-dev . \
+  --namespace saas-dev \
+  --create-namespace \
+  --set postgresql.enabled=true \
+  --set redis.enabled=true \
+  --set minio.enabled=true
+```
+
+See [helm/saas-backend/README.md](helm/saas-backend/README.md) for detailed deployment guide.
+
 ### Production Checklist
 
-- [ ] Set strong `SECRET_KEY`
-- [ ] Configure production database
-- [ ] Set up SSL/TLS certificates
-- [ ] Configure proper CORS origins
-- [ ] Set up monitoring (Sentry, etc.)
-- [ ] Configure email service
-- [ ] Set up backup strategy
-- [ ] Configure rate limiting
-- [ ] Review security headers
-- [ ] Set up logging aggregation
-- [ ] Configure OAuth providers
-- [ ] Set environment to `production`
+Before deploying to production:
 
-## Architecture
+- [ ] Generate strong `SECRET_KEY` (min 32 characters)
+- [ ] Configure production database (RDS, Cloud SQL, etc.)
+- [ ] Set up managed Redis (ElastiCache, Cloud Memorystore)
+- [ ] Configure S3 or object storage
+- [ ] Set up TLS/SSL certificates (Let's Encrypt via cert-manager)
+- [ ] Configure proper CORS origins
+- [ ] Set `APP_ENV=production` and `DEBUG=false`
+- [ ] Set up monitoring (Sentry, Datadog, etc.)
+- [ ] Configure email service (SendGrid, SES, etc.)
+- [ ] Set up backup strategy (automated DB backups)
+- [ ] Configure rate limiting for production traffic
+- [ ] Review and configure security headers
+- [ ] Set up centralized logging (ELK, CloudWatch, etc.)
+- [ ] Configure OAuth providers (production credentials)
+- [ ] Set up alerts and on-call rotation
+- [ ] Document runbooks for common issues
+- [ ] Load test the application
+- [ ] Set up CI/CD pipeline
+
+See [PRODUCTION_READY.md](PRODUCTION_READY.md) for complete production guide.
+
+## 🧪 Development
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=app --cov-report=html
+
+# Run specific test file
+pytest tests/unit/test_security.py -v
+
+# Run integration tests
+pytest tests/integration/ -v
+```
+
+### Code Formatting
+
+```bash
+# Format code
+black app/ tests/
+
+# Sort imports
+ruff check --select I --fix app/ tests/
+
+# Auto-fix linting issues
+ruff check --fix app/ tests/
+```
+
+### Linting
+
+```bash
+# Lint code
+ruff check app/ tests/
+
+# Type checking
+mypy app/
+```
+
+### Security Checks
+
+```bash
+# Security scanning
+bandit -r app/ -ll
+
+# Dependency vulnerabilities
+safety check
+```
+
+### Database Migrations
+
+```bash
+# Create new migration
+alembic revision --autogenerate -m "Add new feature"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback migration
+alembic downgrade -1
+
+# View migration history
+alembic history
+```
+
+### Working with WebSockets
+
+```python
+# Example: Connect to WebSocket with authentication
+import asyncio
+import websockets
+import json
+
+async def test_websocket():
+    # Get JWT token first
+    token = "your-jwt-token"
+
+    uri = f"ws://localhost:8000/api/v1/ws?token={token}"
+    async with websockets.connect(uri) as websocket:
+        # Receive messages
+        message = await websocket.recv()
+        print(f"Received: {message}")
+
+        # Send message
+        await websocket.send(json.dumps({
+            "type": "chat",
+            "message": "Hello!"
+        }))
+
+asyncio.run(test_websocket())
+```
+
+## 🏗️ Architecture
+
+### Core Technologies
+
+- **FastAPI** - Modern async web framework
+- **SQLAlchemy 2.0** - Async ORM with declarative models
+- **Pydantic 2.9+** - Data validation and settings
+- **PostgreSQL 16** - Primary database
+- **Redis 7** - Caching and message broker
+- **Celery** - Distributed task queue
+- **Boto3** - AWS S3 integration
+- **PyOTP** - TOTP 2FA implementation
 
 ### Database Models
 
-- **User** - User accounts with multi-auth support
-- **Organization** - Top-level tenants
-- **Team** - Sub-groups within organizations
-- **Role** - Permission groups
-- **Permission** - Fine-grained access control
-- **OAuthAccount** - Social authentication linkage
-- **APIKey** - Programmatic access tokens
-- **AuditLog** - Security and compliance logging
+- `User` - User accounts with multi-auth support
+- `TOTPSecret` - Two-factor authentication secrets and backup codes
+- `UserSession` - Session tracking with device fingerprinting
+- `File` - File metadata and storage references
+- `Organization` - Top-level tenants
+- `Team` - Sub-groups within organizations
+- `Role` & `Permission` - RBAC implementation
+- `OAuthAccount` - Social authentication linkage
+- `APIKey` - Programmatic access tokens
+- `AuditLog` - Security and compliance logging
+- `Notification` - In-app notification system
+- `Invitation` - Organization invitation system
+- `FeatureFlag` - Gradual rollout and A/B testing
 
 ### Service Layer
 
-- **UserService** - User management operations
-- **AuthService** - Authentication strategies
-- **RBACService** - Role and permission management
-- **OrganizationService** - Multi-tenancy operations
-- **LLMService** - AI/LLM integration
+- `AuthService` - Authentication strategies (local, OAuth, Keycloak)
+- `TOTPService` - 2FA operations (setup, verification, backup codes)
+- `SessionService` - Session management and device tracking
+- `FileStorageService` - File upload/download with S3/local providers
+- `CacheService` - Redis caching with decorator pattern
+- `RBACService` - Role and permission management
+- `WebSocketManager` - Real-time connection management
+- `FeatureFlagService` - Feature flag evaluation
+- `LLMService` - OpenAI/LLM integration
 
-### Background Tasks
+### Background Tasks (Celery)
 
-- **Email Tasks** - Verification, password reset, notifications
-- **PyPI Check** - Dependency version monitoring
-- **Custom Tasks** - Extensible task system
+- Email sending (verification, password reset, notifications)
+- PyPI version checking
+- Session cleanup
+- File processing
+- Custom async operations
 
-## Security Features
+### Deployment Targets
 
-1. **Password Security**
-   - Bcrypt hashing with configurable rounds
-   - Strength validation (length, complexity)
-   - Password history (optional)
+- **Development**: Docker Compose (all-in-one)
+- **Staging**: Kubernetes with Helm subcharts
+- **Production**: Kubernetes with external managed services
 
-2. **Account Protection**
-   - Failed login attempt tracking
-   - Automatic account lockout
-   - Session timeout
+## 📚 Documentation
 
-3. **API Security**
-   - JWT token authentication
-   - API key support
-   - Rate limiting
-   - CORS protection
+- [Architecture Overview](docs/ARCHITECTURE.md) - System design and patterns
+- [API Examples](docs/API_EXAMPLES.md) - Practical usage examples
+- [TLS Setup Guide](docs/TLS_SETUP.md) - Certificate configuration
+- [Docker Compose Guide](DOCKER_COMPOSE.md) - Local development setup
+- [Kubernetes Guide](k8s/README.md) - K8s deployment
+- [Helm Chart Guide](helm/saas-backend/README.md) - Helm deployment
+- [Production Ready Guide](PRODUCTION_READY.md) - Production checklist
 
-4. **Headers**
-   - X-Content-Type-Options
-   - X-Frame-Options
-   - X-XSS-Protection
-   - Strict-Transport-Security
-   - Referrer-Policy
+## 🤝 Contributing
 
-5. **Audit Logging**
-   - All sensitive operations logged
-   - IP address and user agent tracking
-   - Compliance-ready
-
-## Contributing
+Contributions are welcome! Please:
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
+4. Run tests (`pytest`)
+5. Run linting (`ruff check app/ && mypy app/`)
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
 
-## License
+## 📄 License
 
-MIT License - see LICENSE file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## 🆘 Support
 
-For issues and questions:
-- GitHub Issues: [Create an issue]
-- Documentation: See `/docs` directory
-- API Docs: `http://localhost:8000/docs`
+- **Documentation**: See `/docs` directory
+- **API Docs**: http://localhost:8000/docs (when running)
+- **Issues**: [Create an issue](https://github.com/yourusername/saas-backend/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yourusername/saas-backend/discussions)
 
-## Roadmap
+## 🎯 Use Cases
 
-- [ ] GraphQL API support
-- [ ] WebSocket real-time features
-- [ ] Advanced analytics
-- [ ] Multi-factor authentication
-- [ ] SSO integration
-- [ ] Advanced audit reporting
-- [ ] API versioning strategies
-- [ ] Kubernetes deployment configs
-- [ ] Performance monitoring integration
-- [ ] Advanced caching strategies
+This framework is perfect for:
+
+- **SaaS Applications** - Multi-tenant with organization/team structure
+- **API Backends** - RESTful + WebSocket real-time APIs
+- **Mobile Backends** - Secure authentication with file uploads
+- **Enterprise Applications** - SSO, RBAC, audit logging
+- **Microservices** - Containerized, cloud-native deployment
+- **Startups** - Production-ready foundation to build on
+
+## ⭐ Star History
+
+If you find this project helpful, please consider giving it a star!
+
+## 🙏 Acknowledgments
+
+Built with:
+- [FastAPI](https://fastapi.tiangolo.com/) by Sebastián Ramírez
+- [SQLAlchemy](https://www.sqlalchemy.org/)
+- [Pydantic](https://docs.pydantic.dev/)
+- [Celery](https://docs.celeryq.dev/)
+- And many other amazing open-source projects
+
+---
+
+**Built with ❤️ for the developer community**
