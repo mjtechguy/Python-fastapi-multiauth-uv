@@ -1,0 +1,180 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: saas-backend-api
+  namespace: saas-backend
+  labels:
+    app: saas-backend
+    component: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: saas-backend
+      component: api
+  template:
+    metadata:
+      labels:
+        app: saas-backend
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: saas-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "8000"
+        envFrom:
+        - configMapRef:
+            name: saas-backend-config
+        - secretRef:
+            name: saas-backend-secret
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: saas-backend-celery-worker
+  namespace: saas-backend
+  labels:
+    app: saas-backend
+    component: celery-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: saas-backend
+      component: celery-worker
+  template:
+    metadata:
+      labels:
+        app: saas-backend
+        component: celery-worker
+    spec:
+      containers:
+      - name: celery-worker
+        image: saas-backend:latest
+        imagePullPolicy: Always
+        command: ["celery"]
+        args: ["-A", "app.tasks.celery_app", "worker", "--loglevel=info"]
+        envFrom:
+        - configMapRef:
+            name: saas-backend-config
+        - secretRef:
+            name: saas-backend-secret
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: saas-backend-celery-beat
+  namespace: saas-backend
+  labels:
+    app: saas-backend
+    component: celery-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: saas-backend
+      component: celery-beat
+  template:
+    metadata:
+      labels:
+        app: saas-backend
+        component: celery-beat
+    spec:
+      containers:
+      - name: celery-beat
+        image: saas-backend:latest
+        imagePullPolicy: Always
+        command: ["celery"]
+        args: ["-A", "app.tasks.celery_app", "beat", "--loglevel=info"]
+        envFrom:
+        - configMapRef:
+            name: saas-backend-config
+        - secretRef:
+            name: saas-backend-secret
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: saas-backend-flower
+  namespace: saas-backend
+  labels:
+    app: saas-backend
+    component: flower
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: saas-backend
+      component: flower
+  template:
+    metadata:
+      labels:
+        app: saas-backend
+        component: flower
+    spec:
+      containers:
+      - name: flower
+        image: saas-backend:latest
+        imagePullPolicy: Always
+        command: ["celery"]
+        args: ["-A", "app.tasks.celery_app", "flower", "--port=5555"]
+        ports:
+        - containerPort: 5555
+          name: http
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: saas-backend-config
+        - secretRef:
+            name: saas-backend-secret
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi

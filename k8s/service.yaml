@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: saas-backend-api
+  namespace: saas-backend
+  labels:
+    app: saas-backend
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: saas-backend
+    component: api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: saas-backend-flower
+  namespace: saas-backend
+  labels:
+    app: saas-backend
+    component: flower
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5555
+    targetPort: 5555
+    protocol: TCP
+    name: http
+  selector:
+    app: saas-backend
+    component: flower

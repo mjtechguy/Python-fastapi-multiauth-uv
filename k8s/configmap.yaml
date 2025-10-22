@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: saas-backend-config
+  namespace: saas-backend
+data:
+  APP_NAME: "SaaS Backend Framework"
+  APP_ENV: "production"
+  DEBUG: "false"
+  API_V1_PREFIX: "/api/v1"
+  ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_MAX_OVERFLOW: "10"
+  REDIS_CACHE_DB: "1"
+  CORS_ALLOW_CREDENTIALS: "true"
+  BCRYPT_ROUNDS: "12"
+  PASSWORD_MIN_LENGTH: "8"
+  SESSION_TIMEOUT_MINUTES: "60"
+  MAX_LOGIN_ATTEMPTS: "5"
+  LOCKOUT_DURATION_MINUTES: "30"
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_PER_MINUTE: "60"
+  FILE_STORAGE_PROVIDER: "s3"
+  AWS_REGION: "us-east-1"
+  SMTP_HOST: "smtp.gmail.com"
+  SMTP_PORT: "587"
+  LOG_LEVEL: "INFO"
+  PYPI_CHECK_ENABLED: "true"
+  PYPI_CHECK_INTERVAL_HOURS: "24"

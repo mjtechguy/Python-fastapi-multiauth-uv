@@ -10,6 +10,12 @@ from app.models.role import Role, Permission, RolePermission
 from app.models.oauth import OAuthAccount
 from app.models.api_key import APIKey
 from app.models.audit_log import AuditLog
+from app.models.totp import TOTPSecret
+from app.models.session import UserSession
+from app.models.notification import Notification
+from app.models.invitation import Invitation
+from app.models.feature_flag import FeatureFlag
+from app.models.file import File
 
 __all__ = [
     "Base",
@@ -22,4 +28,10 @@ __all__ = [
     "OAuthAccount",
     "APIKey",
     "AuditLog",
+    "TOTPSecret",
+    "UserSession",
+    "Notification",
+    "Invitation",
+    "FeatureFlag",
+    "File",
 ]

@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from app.models.role import Role
     from app.models.oauth import OAuthAccount
     from app.models.api_key import APIKey
+    from app.models.totp import TOTPSecret
+    from app.models.session import UserSession
 
 
 # Association table for user-organization membership
@@ -101,6 +103,12 @@ class User(Base):
     )
     api_keys: Mapped[list["APIKey"]] = relationship(
         "APIKey", back_populates="user", cascade="all, delete-orphan"
+    )
+    totp_secret: Mapped["TOTPSecret | None"] = relationship(
+        "TOTPSecret", back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
+    sessions: Mapped[list["UserSession"]] = relationship(
+        "UserSession", back_populates="user", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

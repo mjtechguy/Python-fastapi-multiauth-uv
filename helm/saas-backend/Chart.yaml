@@ -1,0 +1,19 @@
+apiVersion: v2
+name: saas-backend
+description: Production-grade SaaS backend framework with FastAPI
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - fastapi
+  - saas
+  - backend
+  - api
+  - python
+home: https://github.com/yourusername/saas-backend
+sources:
+  - https://github.com/yourusername/saas-backend
+maintainers:
+  - name: Your Name
+    email: your-email@example.com
+dependencies: []
