@@ -67,7 +67,7 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
   - Redis for caching and message broker
   - MinIO for S3-compatible local storage
   - All application services (API, workers, beat, flower)
-- **Traefik Integration (Optional)** - Modern reverse proxy with:
+- **Traefik Integration (Docker Only)** - Modern reverse proxy for Docker deployments:
   - Automatic SSL/TLS certificates from Let's Encrypt
   - DNS-based routing with subdomains
   - Built-in rate limiting and security headers
@@ -78,11 +78,14 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
   - Health checks and readiness probes
   - Resource limits and requests
   - ConfigMaps and Secrets management
+  - **ingress-nginx** for SSL/TLS and routing (not Traefik)
 - **Helm Charts** - Flexible deployment with optional subcharts:
   - PostgreSQL (Bitnami)
   - Redis (Bitnami)
   - MinIO (Bitnami)
-- **TLS/SSL Support** - Automated certificate management with cert-manager and Let's Encrypt
+- **TLS/SSL Support** - Automated certificate management:
+  - **Docker:** Traefik with Let's Encrypt
+  - **Kubernetes:** cert-manager with Let's Encrypt
 - **Graceful Shutdown** - Production-safe deployments with:
   - SIGTERM/SIGINT signal handling
   - Active request tracking
@@ -204,9 +207,11 @@ celery -A app.tasks.celery_app beat --loglevel=info
 celery -A app.tasks.celery_app flower
 ```
 
-### Option 3: Production with Traefik (SSL/TLS & DNS Routing)
+### Option 3: Docker Production with Traefik (SSL/TLS & DNS Routing)
 
-For production deployments with automatic SSL certificates and domain-based routing:
+For **Docker-based** production deployments with automatic SSL certificates and domain-based routing:
+
+> **Note:** For Kubernetes deployments, use ingress-nginx instead. See [k8s/README.md](k8s/README.md).
 
 ```bash
 # 1. Configure your domain
@@ -561,11 +566,43 @@ docker-compose up -d
 
 See [docs/DOCKER_COMPOSE.md](docs/DOCKER_COMPOSE.md) for detailed guide.
 
+### Docker Production (with Traefik)
+
+For production deployments using Docker (VPS, dedicated servers):
+
+```bash
+# Configure domain and SSL
+cp traefik/.env.example traefik/.env
+# Edit traefik/.env with your domain
+
+# Start with Traefik reverse proxy
+docker-compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
+
+# Or use automated script
+./scripts/start-traefik.sh
+```
+
+**Features:**
+- ✅ Automatic SSL/TLS certificates from Let's Encrypt
+- ✅ DNS-based routing (api.yourdomain.com)
+- ✅ Built-in rate limiting and security headers
+- ✅ Traefik dashboard for monitoring
+
+See [traefik/README.md](traefik/README.md) for detailed guide.
+
+> **Note:** For Kubernetes deployments, use ingress-nginx instead (see below).
+
 ### Production (Kubernetes)
+
+For Kubernetes deployments, the framework uses **ingress-nginx** for routing and **cert-manager** for SSL/TLS certificates.
 
 #### Option 1: Direct Kubernetes Manifests
 
 ```bash
+# Install prerequisites (if not already installed)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+
 # Create namespace
 kubectl apply -f k8s/namespace.yaml
 
@@ -576,10 +613,10 @@ kubectl apply -f k8s/secret.yaml  # Edit first!
 # Deploy services
 kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
-kubectl apply -f k8s/ingress.yaml
+kubectl apply -f k8s/ingress.yaml  # Uses ingress-nginx
 kubectl apply -f k8s/hpa.yaml
 
-# Set up TLS (cert-manager)
+# Set up TLS with cert-manager
 kubectl apply -f k8s/cert-issuer.yaml
 ```
 
@@ -880,8 +917,8 @@ asyncio.run(test_websocket())
 - [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md) - Complete deployment guide
 - [Production Ready Guide](docs/PRODUCTION_READY.md) - Production checklist
 - [TLS Setup Guide](docs/TLS_SETUP.md) - Certificate configuration
-- [Traefik Integration](traefik/README.md) - SSL/TLS with Traefik
-- [Kubernetes Guide](k8s/README.md) - K8s deployment
+- [Traefik Integration](traefik/README.md) - SSL/TLS with Traefik (Docker only)
+- [Kubernetes Guide](k8s/README.md) - K8s deployment with ingress-nginx
 - [Helm Chart Guide](helm/saas-backend/README.md) - Helm deployment
 
 ## 🤝 Contributing

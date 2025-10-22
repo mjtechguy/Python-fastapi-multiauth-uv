@@ -1,10 +1,13 @@
 version: '3.8'
 
-# Traefik Integration Override
+# Traefik Integration Override (Docker Deployments Only)
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
 #
+# IMPORTANT: This configuration is for Docker/Docker Compose deployments only.
+# For Kubernetes deployments, use ingress-nginx instead (see k8s/README.md).
+#
 # This file adds Traefik as a reverse proxy with automatic SSL/TLS certificates
-# and DNS-based routing for production deployments.
+# and DNS-based routing for Docker-based production deployments.
 #
 # Prerequisites:
 # 1. Domain name pointing to your server

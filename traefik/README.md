@@ -1,6 +1,10 @@
-# Traefik Integration Guide
+# Traefik Integration Guide (Docker Only)
 
-This directory contains Traefik configuration for automatic SSL/TLS certificates and DNS-based routing.
+This directory contains Traefik configuration for **Docker-based deployments** with automatic SSL/TLS certificates and DNS-based routing.
+
+> **⚠️ Important:** This Traefik integration is designed for **Docker and Docker Compose deployments only**.
+>
+> **For Kubernetes deployments**, use **ingress-nginx** instead. See [k8s/README.md](../k8s/README.md) for Kubernetes deployment guide.
 
 ## What is Traefik?
 
@@ -232,25 +236,23 @@ Set up monitoring for certificate expiry (Let's Encrypt certs expire in 90 days)
 
 ## Kubernetes Deployment
 
-For Kubernetes, use Traefik IngressRoute:
+**Traefik is not used for Kubernetes deployments in this framework.**
 
-```yaml
-apiVersion: traefik.containo.us/v1alpha1
-kind: IngressRoute
-metadata:
-  name: api-route
-spec:
-  entryPoints:
-    - websecure
-  routes:
-    - match: Host(`api.example.com`)
-      kind: Rule
-      services:
-        - name: api-service
-          port: 8000
-  tls:
-    certResolver: letsencrypt
+For Kubernetes, use **ingress-nginx** with **cert-manager** instead:
+
+```bash
+# Install ingress-nginx
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+# Install cert-manager
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+
+# Deploy application with ingress
+kubectl apply -f k8s/ingress.yaml
+kubectl apply -f k8s/cert-issuer.yaml
 ```
+
+See the [Kubernetes Guide](../k8s/README.md) for complete deployment instructions.
 
 ## Additional Resources
 

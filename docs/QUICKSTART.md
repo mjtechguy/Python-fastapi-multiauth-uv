@@ -20,9 +20,11 @@ That's it! The script will:
 
 ---
 
-## 🔐 Production Startup with Traefik (SSL/TLS)
+## 🔐 Production Startup with Traefik (Docker - SSL/TLS)
 
-For production deployments with automatic SSL certificates and domain routing:
+For **Docker-based** production deployments with automatic SSL certificates and domain routing:
+
+> **Note:** This is for Docker deployments only. For Kubernetes, use ingress-nginx instead.
 
 ```bash
 ./scripts/start-traefik.sh

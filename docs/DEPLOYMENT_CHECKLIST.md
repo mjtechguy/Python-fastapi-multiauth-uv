@@ -242,9 +242,11 @@ curl -X POST http://localhost:8000/api/v1/auth/register \
 - [ ] Review and adjust quota limits
 - [ ] Set up log aggregation (ELK, CloudWatch)
 
-### Traefik Deployment (Optional - Recommended for Production)
+### Traefik Deployment (Docker Only - Optional)
 
-Traefik provides automatic SSL/TLS certificates and DNS-based routing for production deployments.
+**For Docker-based production deployments only.** Traefik provides automatic SSL/TLS certificates and DNS-based routing.
+
+> **Note:** For Kubernetes deployments, use **ingress-nginx** with **cert-manager** instead. See Kubernetes Deployment section below.
 
 **Prerequisites:**
 - Domain name pointing to your server
