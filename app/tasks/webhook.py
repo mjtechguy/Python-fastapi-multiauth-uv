@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 from app.tasks.celery_app import celery_app
+from app.tasks.task_utils import BaseTaskWithDLQ
 from app.db.session import AsyncSessionLocal
 from app.services.webhook import WebhookService
 from app.models.webhook import WebhookDelivery
@@ -12,11 +13,11 @@ from sqlalchemy import select
 
 @celery_app.task(
     name="deliver_webhook",
-    bind=True,
+    base=BaseTaskWithDLQ,
     max_retries=3,
     default_retry_delay=300,  # 5 minutes
 )
-def deliver_webhook_task(self, delivery_id: str) -> dict[str, Any]:
+def deliver_webhook_task(delivery_id: str) -> dict[str, Any]:
     """
     Deliver a webhook asynchronously.
 
@@ -37,26 +38,30 @@ def deliver_webhook_task(self, delivery_id: str) -> dict[str, Any]:
             delivery = result.scalar_one_or_none()
 
             if not delivery:
-                return {"status": "error", "message": "Delivery not found"}
+                raise ValueError(f"Delivery {delivery_id} not found")
 
             # Deliver webhook
             success = await WebhookService.deliver_webhook(db, delivery)
 
+            if not success:
+                raise Exception(f"Webhook delivery failed with status {delivery.status_code}")
+
             return {
-                "status": "success" if success else "failed",
+                "status": "success",
                 "delivery_id": delivery_id,
                 "attempt_count": delivery.attempt_count,
                 "status_code": delivery.status_code,
             }
 
-    try:
-        return asyncio.run(_deliver())
-    except Exception as exc:
-        # Retry on failure
-        raise self.retry(exc=exc)
+    # BaseTaskWithDLQ will handle retries automatically on exception
+    return asyncio.run(_deliver())
 
 
-@celery_app.task(name="trigger_webhook_event")
+@celery_app.task(
+    name="trigger_webhook_event",
+    base=BaseTaskWithDLQ,
+    max_retries=3,
+)
 def trigger_webhook_event_task(
     organization_id: str,
     event_type: str,
@@ -97,7 +102,10 @@ def trigger_webhook_event_task(
     return asyncio.run(_trigger())
 
 
-@celery_app.task(name="retry_failed_webhooks")
+@celery_app.task(
+    name="retry_failed_webhooks",
+    base=BaseTaskWithDLQ,
+)
 def retry_failed_webhooks_task() -> dict[str, Any]:
     """
     Periodic task to retry failed webhook deliveries.
