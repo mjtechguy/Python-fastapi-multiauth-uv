@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "saas-backend.fullname" . }}-config
+  labels:
+    {{- include "saas-backend.labels" . | nindent 4 }}
+data:
+  APP_NAME: {{ .Values.config.appName | quote }}
+  APP_ENV: {{ .Values.config.appEnv | quote }}
+  DEBUG: {{ .Values.config.debug | quote }}
+  API_V1_PREFIX: {{ .Values.config.apiV1Prefix | quote }}
+  ALGORITHM: {{ .Values.config.algorithm | quote }}
+  ACCESS_TOKEN_EXPIRE_MINUTES: {{ .Values.config.accessTokenExpireMinutes | quote }}
+  REFRESH_TOKEN_EXPIRE_DAYS: {{ .Values.config.refreshTokenExpireDays | quote }}
+  DATABASE_POOL_SIZE: {{ .Values.config.databasePoolSize | quote }}
+  DATABASE_MAX_OVERFLOW: {{ .Values.config.databaseMaxOverflow | quote }}
+  REDIS_CACHE_DB: {{ .Values.config.redisCacheDb | quote }}
+  CORS_ALLOW_CREDENTIALS: {{ .Values.config.corsAllowCredentials | quote }}
+  BCRYPT_ROUNDS: {{ .Values.config.bcryptRounds | quote }}
+  PASSWORD_MIN_LENGTH: {{ .Values.config.passwordMinLength | quote }}
+  SESSION_TIMEOUT_MINUTES: {{ .Values.config.sessionTimeoutMinutes | quote }}
+  MAX_LOGIN_ATTEMPTS: {{ .Values.config.maxLoginAttempts | quote }}
+  LOCKOUT_DURATION_MINUTES: {{ .Values.config.lockoutDurationMinutes | quote }}
+  RATE_LIMIT_ENABLED: {{ .Values.config.rateLimitEnabled | quote }}
+  RATE_LIMIT_PER_MINUTE: {{ .Values.config.rateLimitPerMinute | quote }}
+  FILE_STORAGE_PROVIDER: {{ .Values.config.fileStorageProvider | quote }}
+  AWS_REGION: {{ .Values.config.awsRegion | quote }}
+  SMTP_HOST: {{ .Values.config.smtpHost | quote }}
+  SMTP_PORT: {{ .Values.config.smtpPort | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  PYPI_CHECK_ENABLED: {{ .Values.config.pypiCheckEnabled | quote }}
+  PYPI_CHECK_INTERVAL_HOURS: {{ .Values.config.pypiCheckIntervalHours | quote }}
