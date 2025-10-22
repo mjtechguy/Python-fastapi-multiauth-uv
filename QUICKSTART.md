@@ -20,6 +20,42 @@ That's it! The script will:
 
 ---
 
+## 🔐 Production Startup with Traefik (SSL/TLS)
+
+For production deployments with automatic SSL certificates and domain routing:
+
+```bash
+./scripts/start-traefik.sh
+```
+
+**Before running, configure:**
+
+1. **Set your domain:**
+   ```bash
+   cp traefik/.env.example traefik/.env
+   nano traefik/.env  # Update DOMAIN and ACME_EMAIL
+   ```
+
+2. **Update Traefik config:**
+   ```bash
+   nano traefik/traefik.yml  # Update email in certificatesResolvers
+   ```
+
+3. **Configure DNS:**
+   - `api.yourdomain.com` → Your server IP
+   - `traefik.yourdomain.com` → Your server IP
+   - `minio.yourdomain.com` → Your server IP
+   - `s3.yourdomain.com` → Your server IP
+
+4. **Run the script** and access via HTTPS:
+   - API: https://api.yourdomain.com
+   - API Docs: https://api.yourdomain.com/docs
+   - Traefik Dashboard: https://traefik.yourdomain.com
+
+See [traefik/README.md](traefik/README.md) for complete guide.
+
+---
+
 ## 📋 Manual Setup (If You Prefer)
 
 ### Step 1: Prerequisites

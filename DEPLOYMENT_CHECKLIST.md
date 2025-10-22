@@ -242,6 +242,57 @@ curl -X POST http://localhost:8000/api/v1/auth/register \
 - [ ] Review and adjust quota limits
 - [ ] Set up log aggregation (ELK, CloudWatch)
 
+### Traefik Deployment (Optional - Recommended for Production)
+
+Traefik provides automatic SSL/TLS certificates and DNS-based routing for production deployments.
+
+**Prerequisites:**
+- Domain name pointing to your server
+- Ports 80 and 443 accessible from the internet
+- Valid email for Let's Encrypt
+
+**Quick Setup:**
+
+```bash
+# 1. Configure domain
+cp traefik/.env.example traefik/.env
+nano traefik/.env  # Update DOMAIN and ACME_EMAIL
+
+# 2. Update Traefik email
+nano traefik/traefik.yml  # Update email in certificatesResolvers section
+
+# 3. Configure DNS records
+# api.yourdomain.com      → Your server IP
+# traefik.yourdomain.com  → Your server IP
+# minio.yourdomain.com    → Your server IP
+# s3.yourdomain.com       → Your server IP
+
+# 4. Start with Traefik
+./scripts/start-traefik.sh
+# OR manually:
+docker-compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
+```
+
+**Features:**
+- ✅ Automatic SSL/TLS certificates from Let's Encrypt
+- ✅ DNS-based routing (api.yourdomain.com, traefik.yourdomain.com, etc.)
+- ✅ Built-in rate limiting and security headers
+- ✅ Zero-downtime deployments with health checks
+- ✅ Traefik dashboard for monitoring
+
+**Access Services:**
+- API: https://api.yourdomain.com
+- API Docs: https://api.yourdomain.com/docs
+- Traefik Dashboard: https://traefik.yourdomain.com (default: admin/changeme)
+
+**Security:**
+- [ ] Change Traefik dashboard password
+- [ ] Restrict Traefik dashboard access by IP (optional)
+- [ ] Review rate limiting settings
+- [ ] Monitor certificate expiry (auto-renews 30 days before)
+
+See [traefik/README.md](traefik/README.md) for complete guide.
+
 ### Environment Variables for Production
 
 Update `.env` for production:

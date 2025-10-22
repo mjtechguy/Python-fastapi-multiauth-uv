@@ -1,0 +1,97 @@
+################################################################
+# Traefik Static Configuration
+################################################################
+
+# Global Settings
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+# API and Dashboard
+api:
+  dashboard: true
+  insecure: false  # Disable insecure access, use HTTPS with auth
+
+# Entry Points
+entryPoints:
+  # HTTP (port 80) - redirect to HTTPS
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  # HTTPS (port 443)
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: example.com
+            sans:
+              - "*.example.com"
+
+# Certificate Resolvers
+certificatesResolvers:
+  # Let's Encrypt - HTTP Challenge
+  letsencrypt:
+    acme:
+      email: your-email@example.com  # CHANGE THIS!
+      storage: /certificates/acme.json
+
+      # Use staging for testing to avoid rate limits
+      # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+
+      # HTTP Challenge (recommended for most cases)
+      httpChallenge:
+        entryPoint: web
+
+      # Uncomment for DNS Challenge (Cloudflare example)
+      # dnsChallenge:
+      #   provider: cloudflare
+      #   delayBeforeCheck: 30
+      #   resolvers:
+      #     - "1.1.1.1:53"
+      #     - "8.8.8.8:53"
+
+# Providers
+providers:
+  # Docker provider
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false  # Only expose services with traefik.enable=true
+    network: saas_network
+    watch: true
+
+  # File provider for dynamic configuration
+  file:
+    directory: /dynamic
+    watch: true
+
+# Logging
+log:
+  level: INFO  # DEBUG, INFO, WARN, ERROR, FATAL, PANIC
+  format: json
+
+# Access Logs
+accessLog:
+  format: json
+  fields:
+    defaultMode: keep
+    headers:
+      defaultMode: keep
+
+# Metrics (optional - Prometheus)
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    entryPoint: metrics
+
+# Health Check
+ping:
+  entryPoint: web

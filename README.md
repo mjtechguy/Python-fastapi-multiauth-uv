@@ -67,6 +67,12 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
   - Redis for caching and message broker
   - MinIO for S3-compatible local storage
   - All application services (API, workers, beat, flower)
+- **Traefik Integration (Optional)** - Modern reverse proxy with:
+  - Automatic SSL/TLS certificates from Let's Encrypt
+  - DNS-based routing with subdomains
+  - Built-in rate limiting and security headers
+  - Zero-downtime deployments with health checks
+  - Production-ready with one command: `docker-compose -f docker-compose.yml -f docker-compose.traefik.yml up -d`
 - **Kubernetes Ready** - Production-grade K8s manifests with:
   - Horizontal Pod Autoscaler (HPA)
   - Health checks and readiness probes
@@ -181,6 +187,29 @@ celery -A app.tasks.celery_app beat --loglevel=info
 # 9. Start Flower (optional, for monitoring)
 celery -A app.tasks.celery_app flower
 ```
+
+### Option 3: Production with Traefik (SSL/TLS & DNS Routing)
+
+For production deployments with automatic SSL certificates and domain-based routing:
+
+```bash
+# 1. Configure your domain
+cp traefik/.env.example traefik/.env
+nano traefik/.env  # Update DOMAIN and ACME_EMAIL
+
+# 2. Update Traefik configuration
+nano traefik/traefik.yml  # Update email for Let's Encrypt
+
+# 3. Start with Traefik
+docker-compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
+
+# 4. Access via HTTPS
+# API: https://api.yourdomain.com
+# API Docs: https://api.yourdomain.com/docs
+# Traefik Dashboard: https://traefik.yourdomain.com
+```
+
+See [traefik/README.md](traefik/README.md) for complete setup guide.
 
 ## 📁 Project Structure
 

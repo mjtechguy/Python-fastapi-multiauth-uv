@@ -1,0 +1,92 @@
+################################################################
+# Traefik Dynamic Configuration - Middleware
+################################################################
+
+http:
+  middlewares:
+    # Security Headers
+    security-headers:
+      headers:
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        frameDeny: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customResponseHeaders:
+          X-Robots-Tag: "none,noarchive,nosnippet,notranslate,noimageindex"
+        customFrameOptionsValue: "SAMEORIGIN"
+
+    # Rate Limiting - Strict
+    rate-limit-strict:
+      rateLimit:
+        average: 10
+        burst: 20
+        period: 1m
+
+    # Rate Limiting - Medium
+    rate-limit-medium:
+      rateLimit:
+        average: 50
+        burst: 100
+        period: 1m
+
+    # Rate Limiting - Relaxed
+    rate-limit-relaxed:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: 1m
+
+    # CORS Middleware (optional, if needed at proxy level)
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "*"  # Adjust for your domains
+        accessControlMaxAge: 100
+        addVaryHeader: true
+
+    # IP Whitelist (example)
+    # ip-whitelist:
+    #   ipWhiteList:
+    #     sourceRange:
+    #       - "127.0.0.1/32"
+    #       - "192.168.1.0/24"
+
+    # Compress responses
+    compression:
+      compress: {}
+
+    # Redirect to WWW
+    redirect-to-www:
+      redirectRegex:
+        regex: "^https://(?:www\\.)?(.+)"
+        replacement: "https://www.${1}"
+        permanent: true
+
+    # Redirect to non-WWW
+    redirect-to-non-www:
+      redirectRegex:
+        regex: "^https://www\\.(.+)"
+        replacement: "https://${1}"
+        permanent: true
+
+  # Service defaults (optional)
+  services:
+    # Example service with health check
+    # my-service:
+    #   loadBalancer:
+    #     servers:
+    #       - url: "http://backend:8000"
+    #     healthCheck:
+    #       path: /health
+    #       interval: "10s"
+    #       timeout: "3s"
