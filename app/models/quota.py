@@ -1,13 +1,14 @@
 """Usage quota models for SaaS monetization."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, BigInteger
+from sqlalchemy import ForeignKey, String, BigInteger, DateTime
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base_class import Base
+from app.db.session import Base
 
 if TYPE_CHECKING:
     from app.models.organization import Organization
@@ -41,12 +42,12 @@ class OrganizationQuota(Base):
     max_file_size_bytes: Mapped[int] = mapped_column(BigInteger, default=10_485_760)  # 10MB
 
     # Tracking timestamps
-    api_calls_reset_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    file_uploads_reset_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    api_calls_reset_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    file_uploads_reset_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     last_updated_at: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization", back_populates="quota")
@@ -112,11 +113,11 @@ class UsageLog(Base):
     # Usage type: api_call, file_upload, storage_add, storage_remove, user_add, user_remove
     usage_type: Mapped[str] = mapped_column(String(50), index=True)
 
-    # Additional metadata
-    metadata: Mapped[dict | None] = mapped_column(default=None, nullable=True)
+    # Additional extra data
+    extra_data: Mapped[dict | None] = mapped_column(JSONB, default=None, nullable=True)
 
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization")

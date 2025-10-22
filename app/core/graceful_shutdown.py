@@ -1,11 +1,12 @@
 """Graceful shutdown handler for production deployments."""
 
 import asyncio
-import logging
 import signal
 from typing import Callable, Optional
 
-logger = logging.getLogger(__name__)
+from app.core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class GracefulShutdown:
@@ -48,7 +49,7 @@ class GracefulShutdown:
     def trigger_shutdown(self) -> None:
         """Trigger shutdown process."""
         if not self.is_shutting_down:
-            logger.info("Graceful shutdown triggered")
+            logger.info("graceful_shutdown_triggered")
             self.is_shutting_down = True
             self._shutdown_event.set()
 
@@ -59,28 +60,34 @@ class GracefulShutdown:
         Waits up to self.timeout seconds for all active requests to finish.
         """
         if self.active_requests == 0:
-            logger.info("No active requests to wait for")
+            logger.info("no_active_requests")
             return
 
-        logger.info(f"Waiting for {self.active_requests} active requests to complete...")
+        logger.info("waiting_for_active_requests", count=self.active_requests)
 
         start_time = asyncio.get_event_loop().time()
         while self.active_requests > 0:
             elapsed = asyncio.get_event_loop().time() - start_time
             if elapsed >= self.timeout:
                 logger.warning(
-                    f"Shutdown timeout reached with {self.active_requests} requests still active"
+                    "shutdown_timeout_reached",
+                    active_requests=self.active_requests,
+                    timeout=self.timeout
                 )
                 break
 
-            logger.info(f"Still waiting for {self.active_requests} requests (elapsed: {elapsed:.1f}s)")
+            logger.debug(
+                "waiting_for_requests",
+                active_requests=self.active_requests,
+                elapsed_seconds=round(elapsed, 1)
+            )
             await asyncio.sleep(1)
 
-        logger.info("All active requests completed or timeout reached")
+        logger.info("active_requests_complete")
 
     async def run_cleanup_callbacks(self) -> None:
         """Run all registered cleanup callbacks."""
-        logger.info(f"Running {len(self._cleanup_callbacks)} cleanup callbacks")
+        logger.info("running_cleanup_callbacks", count=len(self._cleanup_callbacks))
 
         for callback in self._cleanup_callbacks:
             try:
@@ -89,7 +96,12 @@ class GracefulShutdown:
                 else:
                     callback()
             except Exception as e:
-                logger.error(f"Error in cleanup callback: {e}", exc_info=True)
+                logger.error(
+                    "cleanup_callback_error",
+                    callback_name=callback.__name__,
+                    error=str(e),
+                    exc_info=True
+                )
 
     def setup_signal_handlers(self) -> None:
         """
@@ -100,13 +112,13 @@ class GracefulShutdown:
         def handle_signal(sig, frame):
             """Signal handler that triggers graceful shutdown."""
             signal_name = signal.Signals(sig).name
-            logger.info(f"Received {signal_name} signal, initiating graceful shutdown...")
+            logger.info("shutdown_signal_received", signal=signal_name)
             self.trigger_shutdown()
 
         signal.signal(signal.SIGTERM, handle_signal)
         signal.signal(signal.SIGINT, handle_signal)
 
-        logger.info("Graceful shutdown signal handlers registered")
+        logger.info("shutdown_signal_handlers_registered")
 
 
 # Global instance

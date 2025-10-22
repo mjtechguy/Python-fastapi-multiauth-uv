@@ -50,19 +50,91 @@ We will respond within 48 hours and work with you to address the issue.
 - Session management
 - IP address logging
 
+## Environment Variables & Secrets Management
+
+### Critical Configuration Before Production
+
+**⚠️ NEVER use default credentials in production!**
+
+The following environment variables **MUST** be changed from their default values:
+
+#### 1. Application Secret Key
+
+Generate a secure random key:
+```bash
+# Using OpenSSL
+openssl rand -hex 32
+
+# Using Python
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Update in `.env`:
+```bash
+SECRET_KEY=your-generated-secure-key-minimum-32-characters
+```
+
+#### 2. Database Credentials
+
+```bash
+POSTGRES_USER=secure_username
+POSTGRES_PASSWORD=secure_random_password
+POSTGRES_DB=your_database_name
+
+# Update DATABASE_URL to match
+DATABASE_URL=postgresql+asyncpg://secure_username:secure_random_password@postgres:5432/your_database_name
+```
+
+#### 3. MinIO/S3 Storage
+
+```bash
+MINIO_ROOT_USER=secure_minio_username
+MINIO_ROOT_PASSWORD=secure_minio_password
+
+# Must match MinIO credentials
+AWS_ACCESS_KEY_ID=secure_minio_username
+AWS_SECRET_ACCESS_KEY=secure_minio_password
+```
+
+### Environment Files
+
+| File | Purpose | Git Tracked | Required |
+|------|---------|-------------|----------|
+| `.env.example` | Template with placeholders | ✅ Yes | No (reference) |
+| `.env` | Active configuration | ❌ No | Yes |
+| `.env.local` | Local overrides | ❌ No | Optional |
+| `.env.production` | Production secrets | ❌ No | Yes (prod) |
+
+**The `.env` file is already in `.gitignore`.** Always verify before committing.
+
+### Docker Compose Configuration
+
+The `docker-compose.yml` now uses environment variables with safe defaults for development:
+
+```yaml
+environment:
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  SECRET_KEY: ${SECRET_KEY}
+```
+
+- Variables with `:-` syntax provide development defaults
+- Variables without defaults (like `SECRET_KEY`) must be set in `.env`
+- Production should override all defaults with secure values
+
 ## Security Best Practices
 
 ### For Deployment
-1. Use strong `SECRET_KEY` (minimum 32 characters)
-2. Enable HTTPS/TLS in production
-3. Set `APP_ENV=production`
-4. Configure proper CORS origins
-5. Use environment variables for secrets
-6. Enable rate limiting
-7. Regular security updates
-8. Database backups
-9. Monitor audit logs
-10. Implement network segmentation
+1. **Change all default passwords** - See environment variables section above
+2. Use strong `SECRET_KEY` (minimum 32 characters)
+3. Enable HTTPS/TLS in production
+4. Set `APP_ENV=production`
+5. Configure proper CORS origins (never use `*` in production)
+6. Use environment variables for secrets
+7. Enable rate limiting
+8. Regular security updates
+9. Database backups
+10. Monitor audit logs
+11. Implement network segmentation
 
 ### For Development
 1. Never commit secrets to version control

@@ -115,7 +115,7 @@ def retry_failed_webhooks_task() -> dict[str, Any]:
         Dictionary with retry statistics
     """
     import asyncio
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     async def _retry():
         async with AsyncSessionLocal() as db:
@@ -123,7 +123,7 @@ def retry_failed_webhooks_task() -> dict[str, Any]:
             result = await db.execute(
                 select(WebhookDelivery).where(
                     WebhookDelivery.status == "retrying",
-                    WebhookDelivery.next_retry_at <= datetime.utcnow(),
+                    WebhookDelivery.next_retry_at <= datetime.now(timezone.utc),
                 )
             )
             deliveries = list(result.scalars().all())

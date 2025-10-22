@@ -14,6 +14,41 @@ from app.schemas.organization import OrganizationCreate, OrganizationUpdate
 class OrganizationService:
     """Service for organization management."""
 
+    DEFAULT_ORG_NAME = "Default Organization"
+    DEFAULT_ORG_SLUG = "default"
+
+    @staticmethod
+    async def get_or_create_default(db: AsyncSession) -> Organization:
+        """Get or create the default organization.
+
+        The default organization is used when users are not explicitly added to an organization.
+        It's automatically created on first use.
+        """
+        # Try to get existing default org
+        default_org = await OrganizationService.get_by_slug(db, OrganizationService.DEFAULT_ORG_SLUG)
+
+        if default_org:
+            return default_org
+
+        # Create default org with system owner (first user will be owner)
+        from app.models.user import User
+
+        # Get first user as owner, or create with None owner_id (will be set later)
+        first_user_result = await db.execute(select(User).limit(1))
+        first_user = first_user_result.scalar_one_or_none()
+
+        default_org = Organization(
+            name=OrganizationService.DEFAULT_ORG_NAME,
+            slug=OrganizationService.DEFAULT_ORG_SLUG,
+            description="Default organization for all users",
+            owner_id=first_user.id if first_user else None,
+        )
+        db.add(default_org)
+        await db.flush()
+        await db.refresh(default_org)
+
+        return default_org
+
     @staticmethod
     async def create(
         db: AsyncSession, org_in: OrganizationCreate, owner_id: UUID
@@ -74,7 +109,57 @@ class OrganizationService:
 
     @staticmethod
     async def add_member(db: AsyncSession, org_id: UUID, user_id: UUID) -> None:
-        """Add a member to the organization."""
+        """Add a member to the organization.
+
+        Regular users can only be members of one organization at a time.
+        Global admins (superusers) can be members of multiple organizations.
+
+        Special behavior for default organization:
+        - Users in the default org are automatically moved to the new org
+        - Users in other orgs must be explicitly removed first
+
+        Raises:
+            ValueError: If user is already a member of a non-default organization and is not a superuser
+        """
+        # Get user to check if they're a superuser
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+
+        if not user:
+            raise ValueError("User not found")
+
+        # Superusers can be in multiple organizations
+        if not user.is_superuser:
+            # Check if user is already in another organization
+            existing_orgs = await db.execute(
+                select(user_organizations).where(user_organizations.c.user_id == user_id)
+            )
+            existing = existing_orgs.first()
+
+            if existing and existing.organization_id != org_id:
+                # Get the organization to check if it's the default org
+                existing_org_result = await db.execute(
+                    select(Organization).where(Organization.id == existing.organization_id)
+                )
+                existing_org = existing_org_result.scalar_one_or_none()
+
+                # If user is in the default org, automatically move them
+                if existing_org and existing_org.slug == OrganizationService.DEFAULT_ORG_SLUG:
+                    # Remove from default org
+                    await db.execute(
+                        user_organizations.delete().where(
+                            user_organizations.c.user_id == user_id,
+                            user_organizations.c.organization_id == existing.organization_id,
+                        )
+                    )
+                else:
+                    # User is in a non-default org, require explicit removal
+                    raise ValueError(
+                        f"User is already a member of another organization ({existing_org.name if existing_org else 'Unknown'}). "
+                        "Regular users can only belong to one organization at a time. "
+                        "Remove them from their current organization first, or grant them superuser status."
+                    )
+
         await db.execute(
             user_organizations.insert().values(user_id=user_id, organization_id=org_id)
         )
@@ -101,6 +186,17 @@ class OrganizationService:
             )
         )
         return result.first() is not None
+
+    @staticmethod
+    async def list_members(db: AsyncSession, org_id: UUID) -> list[User]:
+        """List all members of an organization."""
+        result = await db.execute(
+            select(User)
+            .join(user_organizations)
+            .where(user_organizations.c.organization_id == org_id)
+            .order_by(user_organizations.c.created_at)
+        )
+        return list(result.scalars().all())
 
     @staticmethod
     async def list_user_organizations(

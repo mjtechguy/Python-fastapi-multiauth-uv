@@ -1,7 +1,7 @@
 """Quota service for usage tracking and enforcement."""
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import select, func
@@ -39,7 +39,7 @@ class QuotaService:
         db: AsyncSession, quota: OrganizationQuota
     ) -> OrganizationQuota:
         """Reset monthly quotas if needed."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         # Reset if more than 30 days have passed
         if (now - quota.api_calls_reset_at).days >= 30:
             quota.current_api_calls_this_month = 0
@@ -53,7 +53,7 @@ class QuotaService:
         db: AsyncSession, quota: OrganizationQuota
     ) -> OrganizationQuota:
         """Reset daily quotas if needed."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         # Reset if more than 1 day has passed
         if (now - quota.file_uploads_reset_at).days >= 1:
             quota.current_file_uploads_today = 0
@@ -80,7 +80,7 @@ class QuotaService:
             organization_id=organization_id,
             user_id=user_id,
             usage_type="api_call",
-            metadata=metadata,
+            extra_data=metadata,
         )
         db.add(log)
         await db.commit()
@@ -105,7 +105,7 @@ class QuotaService:
             organization_id=organization_id,
             user_id=user_id,
             usage_type="file_upload",
-            metadata={**(metadata or {}), "file_size": file_size},
+            extra_data={**(metadata or {}), "file_size": file_size},
         )
         db.add(log)
         await db.commit()
@@ -127,7 +127,7 @@ class QuotaService:
             organization_id=organization_id,
             user_id=user_id,
             usage_type="storage_remove",
-            metadata={**(metadata or {}), "file_size": file_size},
+            extra_data={**(metadata or {}), "file_size": file_size},
         )
         db.add(log)
         await db.commit()
@@ -148,7 +148,7 @@ class QuotaService:
             organization_id=organization_id,
             user_id=user_id,
             usage_type="user_add",
-            metadata=metadata,
+            extra_data=metadata,
         )
         db.add(log)
         await db.commit()
@@ -169,7 +169,7 @@ class QuotaService:
             organization_id=organization_id,
             user_id=user_id,
             usage_type="user_remove",
-            metadata=metadata,
+            extra_data=metadata,
         )
         db.add(log)
         await db.commit()

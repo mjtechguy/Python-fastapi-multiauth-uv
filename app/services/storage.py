@@ -17,7 +17,7 @@ class StorageService:
     """Abstract storage service interface."""
 
     async def upload(
-        self, file: BinaryIO, filename: str, content_type: str
+        self, file: BinaryIO, filename: str, content_type: str, org_id: str | None = None, user_id: str | None = None
     ) -> Tuple[str, str]:
         """
         Upload file to storage.
@@ -26,6 +26,8 @@ class StorageService:
             file: File-like object
             filename: Filename
             content_type: MIME type
+            org_id: Optional organization ID for path structure
+            user_id: Optional user ID for path structure
 
         Returns:
             Tuple of (storage_path, provider)
@@ -98,12 +100,22 @@ class S3StorageService(StorageService):
         self.s3_client = boto3.client(**client_kwargs)
 
     async def upload(
-        self, file: BinaryIO, filename: str, content_type: str
+        self, file: BinaryIO, filename: str, content_type: str, org_id: str | None = None, user_id: str | None = None
     ) -> Tuple[str, str]:
-        """Upload file to S3."""
-        # Generate unique S3 key
+        """Upload file to S3 with optional organization/user path."""
+        # Generate unique S3 key with org/user path structure
         file_ext = Path(filename).suffix
-        s3_key = f"uploads/{uuid.uuid4()}{file_ext}"
+        unique_filename = f"{uuid.uuid4()}{file_ext}"
+
+        # Build path: uploads/org_<org_id>/user_<user_id>/filename
+        path_parts = ["uploads"]
+        if org_id:
+            path_parts.append(f"org_{org_id}")
+        if user_id:
+            path_parts.append(f"user_{user_id}")
+        path_parts.append(unique_filename)
+
+        s3_key = "/".join(path_parts)
 
         try:
             # Upload to S3
@@ -161,16 +173,25 @@ class LocalStorageService(StorageService):
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     async def upload(
-        self, file: BinaryIO, filename: str, content_type: str
+        self, file: BinaryIO, filename: str, content_type: str, org_id: str | None = None, user_id: str | None = None
     ) -> Tuple[str, str]:
-        """Upload file to local filesystem."""
+        """Upload file to local filesystem with optional organization/user path."""
         # Generate unique filename
         file_ext = Path(filename).suffix
         unique_filename = f"{uuid.uuid4()}{file_ext}"
 
-        # Create subdirectory based on first 2 chars of UUID (for better file organization)
-        subdir = unique_filename[:2]
-        upload_dir = self.base_path / subdir
+        # Build path: uploads/org_<org_id>/user_<user_id>/filename
+        path_parts = []
+        if org_id:
+            path_parts.append(f"org_{org_id}")
+        if user_id:
+            path_parts.append(f"user_{user_id}")
+
+        # Add subdirectory based on first 2 chars of UUID (for better file organization within user folder)
+        path_parts.append(unique_filename[:2])
+
+        # Create directory structure
+        upload_dir = self.base_path / Path(*path_parts)
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         # Save file
@@ -179,7 +200,7 @@ class LocalStorageService(StorageService):
             f.write(file.read())
 
         # Return relative path
-        relative_path = f"{subdir}/{unique_filename}"
+        relative_path = str(Path(*path_parts) / unique_filename)
         return relative_path, "local"
 
     async def download(self, storage_path: str) -> bytes:
@@ -296,7 +317,7 @@ class FileStorageService:
         return output
 
     async def upload(
-        self, file: BinaryIO, filename: str, content_type: str
+        self, file: BinaryIO, filename: str, content_type: str, org_id: str | None = None, user_id: str | None = None
     ) -> Tuple[str, str, str]:
         """
         Upload file to storage.
@@ -305,6 +326,8 @@ class FileStorageService:
             file: File-like object
             filename: Original filename
             content_type: MIME type
+            org_id: Optional organization ID for path structure
+            user_id: Optional user ID for path structure
 
         Returns:
             Tuple of (storage_path, provider, checksum)
@@ -312,8 +335,8 @@ class FileStorageService:
         # Calculate checksum
         checksum = self.calculate_checksum(file)
 
-        # Upload to provider
-        storage_path, provider = await self.provider.upload(file, filename, content_type)
+        # Upload to provider with org/user path
+        storage_path, provider = await self.provider.upload(file, filename, content_type, org_id, user_id)
 
         return storage_path, provider, checksum
 

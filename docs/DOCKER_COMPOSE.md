@@ -25,30 +25,30 @@ Complete development environment with all required services.
 
 5. **PostgreSQL** - Primary database
    - Port: `5432`
-   - Database: `saas_db`
-   - User: `postgres`
-   - Password: `postgres`
+   - Database: `saas_db` (from `.env`)
+   - User: `postgres` (from `.env`)
+   - Password: Configured in `.env` (default: `postgres`)
 
 6. **Adminer** - Database management UI
    - Port: `8080`
    - URL: http://localhost:8080
    - System: PostgreSQL
    - Server: `postgres`
-   - Username: `postgres`
-   - Password: `postgres`
-   - Database: `saas_db`
+   - Username: From `POSTGRES_USER` in `.env`
+   - Password: From `POSTGRES_PASSWORD` in `.env`
+   - Database: From `POSTGRES_DB` in `.env`
 
 7. **Redis** - Cache and message broker
    - Port: `6379`
    - Used for: Caching, Celery broker, session storage
 
 8. **MinIO** - S3-compatible object storage
-   - API Port: `9000`
-   - Console Port: `9001`
+   - API Port: `9000` (configurable via `MINIO_API_PORT` in `.env`)
+   - Console Port: `9001` (configurable via `MINIO_CONSOLE_PORT` in `.env`)
    - Console: http://localhost:9001
-   - Access Key: `minioadmin`
-   - Secret Key: `minioadmin`
-   - Bucket: `saas-uploads` (auto-created)
+   - Access Key: From `MINIO_ROOT_USER` in `.env` (default: `minioadmin`)
+   - Secret Key: From `MINIO_ROOT_PASSWORD` in `.env` (default: `minioadmin`)
+   - Bucket: From `AWS_S3_BUCKET` in `.env` (default: `saas-uploads`, auto-created)
 
 ## Quick Start
 
@@ -58,6 +58,34 @@ Complete development environment with all required services.
 - Docker Compose 2.0+
 - 4GB RAM minimum
 - 10GB disk space
+
+### Environment Configuration
+
+**IMPORTANT: Security First!**
+
+Before starting the services, you **must** configure environment variables:
+
+1. **Copy the example environment file:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Update critical security values in `.env`:**
+   - `SECRET_KEY` - **MUST** be changed to a secure random string (min 32 characters)
+   - `POSTGRES_PASSWORD` - Change from default `postgres`
+   - `MINIO_ROOT_PASSWORD` - Change from default `minioadmin`
+   - `AWS_SECRET_ACCESS_KEY` - Should match `MINIO_ROOT_PASSWORD`
+
+3. **Generate a secure SECRET_KEY:**
+   ```bash
+   # Linux/macOS
+   openssl rand -hex 32
+
+   # Or Python
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+
+**Note:** The `.env` file is already in `.gitignore` to prevent accidental commits. Never commit credentials to version control.
 
 ### Start All Services
 

@@ -11,7 +11,7 @@ uv pip install -e ".[cli]"
 ## Quick Start
 
 ```bash
-# 1. Register
+# 1. Register (first user becomes global admin automatically!)
 python cli.py auth register
 
 # 2. Login (saves token)
@@ -20,6 +20,100 @@ python cli.py auth login
 # 3. Test API
 python cli.py auth me
 python cli.py health check-all
+```
+
+**Note**: The first user you register automatically becomes a **Global Admin (superuser)** with full system access!
+
+## Complete End-to-End Workflow
+
+Here's a complete walkthrough of creating and managing an organization with teams:
+
+```bash
+# 1. Register and Login (first user becomes global admin automatically!)
+python cli.py auth register --email admin@company.com --password 'SecurePass123!' --name "Admin User"
+
+python cli.py auth login --email admin@company.com --password 'SecurePass123!'
+
+# 2. Create Organization
+python cli.py org create \
+  --name "My Company" \
+  --slug "my-company" \
+  --description "Our awesome company"
+
+# Save organization ID from response (e.g., 550e8400-e29b-41d4-a716-446655440000)
+ORG_ID="<copy-from-response>"
+
+# 3. Create Teams
+python cli.py teams create \
+  --name "Engineering" \
+  --slug "engineering" \
+  --org-id "$ORG_ID" \
+  --description "Software development team"
+
+# Save team ID from response
+TEAM_ID="<copy-from-response>"
+
+python cli.py teams create \
+  --name "Marketing" \
+  --slug "marketing" \
+  --org-id "$ORG_ID"
+
+# 4. List Your Teams
+python cli.py teams list --org-id "$ORG_ID"
+
+# 5. Register Another User (for testing member management)
+# Note: The user ID is in the response, save it for next steps
+python cli.py auth logout
+python cli.py auth register --email developer@company.com --password 'SecurePass123!' --name "Developer User"
+
+# Get the new user ID from the response above
+USER_ID="<copy-the-id-from-response>"
+
+# 6. Login Back as Admin
+python cli.py auth login --email admin@company.com --password 'SecurePass123!'
+
+# 7. Add User to Organization FIRST (required before adding to team)
+python cli.py org add-member "$ORG_ID" \
+  --user-id "$USER_ID" \
+  --role "member"
+
+# Verify organization membership
+python cli.py org list-members "$ORG_ID"
+
+# 8. Add Member to Team (user must be in org first!)
+python cli.py teams add-member "$TEAM_ID" \
+  --user-id "$USER_ID"
+
+# 9. List Team Members
+python cli.py teams list-members "$TEAM_ID"
+
+# 10. Upload Files
+python cli.py files upload test.txt
+python cli.py files list
+
+# 11. Setup Webhooks
+python cli.py webhooks events
+python cli.py webhooks create \
+  --url-endpoint "https://webhook.site/your-id" \
+  --events "user.created,team.created,file.uploaded"
+
+# 12. Check System Health
+python cli.py health check-all
+
+# 13. Monitor Usage
+python cli.py quota status
+python cli.py sessions stats
+
+# 14. Cleanup (Testing)
+# Remove from team first
+python cli.py teams remove-member "$TEAM_ID" --user-id "$USER_ID"
+# Then remove from organization
+python cli.py org remove-member "$ORG_ID" --user-id "$USER_ID"
+# Delete team
+python cli.py teams delete "$TEAM_ID" --yes
+
+# 15. Logout
+python cli.py auth logout
 ```
 
 ---
@@ -37,13 +131,23 @@ python cli.py auth register
 - Password (hidden)
 - Full name
 
-**With options:**
+**With options (single line - recommended):**
+```bash
+python cli.py auth register --email user@example.com --password 'SecurePass123!' --name "John Doe"
+```
+
+**ZSH users**: Use single quotes `'` around passwords with special characters like `!` to prevent history expansion.
+
+**Bash users**: Can use double quotes `"` but single quotes `'` also work.
+
+**Multi-line format (paste all lines at once):**
 ```bash
 python cli.py auth register \
   --email user@example.com \
-  --password "SecurePass123!" \
+  --password 'SecurePass123!' \
   --name "John Doe"
 ```
+Note: The `\` allows line continuation. Paste all lines together or type on one line.
 
 ### Login
 
@@ -90,6 +194,60 @@ Clears saved tokens.
 
 ---
 
+## Admin Commands (Global Admin / Superuser Management)
+
+**Note**: Only superusers can use these commands. The first registered user automatically becomes a superuser.
+
+### List All Global Admins
+
+```bash
+python cli.py admin list
+```
+
+Shows all users with superuser (global admin) status.
+
+### Grant Global Admin Status
+
+```bash
+python cli.py admin grant <user_id>
+```
+
+**Example:**
+```bash
+# First, get the user ID you want to promote
+python cli.py auth login admin@example.com password
+
+# View all users (superuser only)
+# Use API or get user ID from registration
+
+# Grant superuser status
+python cli.py admin grant "123e4567-e89b-12d3-a456-426614174000"
+```
+
+**Requirements:**
+- Caller must be a superuser
+- Target user must exist and not already be a superuser
+
+### Revoke Global Admin Status
+
+```bash
+python cli.py admin revoke <user_id>
+```
+
+**Example:**
+```bash
+python cli.py admin revoke "123e4567-e89b-12d3-a456-426614174000"
+```
+
+**Requirements:**
+- Caller must be a superuser
+- Cannot revoke your own superuser status (safety feature)
+- Target user must currently be a superuser
+
+**See also:** [Global Admin Documentation](GLOBAL_ADMIN.md) for detailed information about the superuser system.
+
+---
+
 ## Organization Commands
 
 ### Create Organization
@@ -132,6 +290,195 @@ Get details of specific organization.
 python cli.py org get 550e8400-e29b-41d4-a716-446655440000
 ```
 
+### Add Member to Organization
+
+```bash
+python cli.py org add-member <org-id>
+```
+
+**Interactive prompt:**
+- User ID
+
+**With options:**
+```bash
+python cli.py org add-member <org-id> \
+  --user-id "770e8400-e29b-41d4-a716-446655440000" \
+  --role "member"
+```
+
+**Roles:**
+- `owner` - Full control over organization
+- `admin` - Manage members and settings
+- `member` - Regular member access (default)
+
+**⚠️ Important:** Users must be added to the organization **before** they can be added to any teams within that organization.
+
+### Remove Member from Organization
+
+```bash
+python cli.py org remove-member <org-id>
+```
+
+**Interactive prompt:**
+- User ID
+
+**With options:**
+```bash
+python cli.py org remove-member <org-id> \
+  --user-id "770e8400-e29b-41d4-a716-446655440000"
+```
+
+**Note:** Removing a user from an organization will also remove them from all teams in that organization.
+
+### List Organization Members
+
+```bash
+python cli.py org list-members <org-id>
+```
+
+Shows all organization members with:
+- User ID
+- Email
+- Full name
+- Role (owner, admin, member)
+- Join date
+
+**Example:**
+```bash
+python cli.py org list-members 550e8400-e29b-41d4-a716-446655440000
+```
+
+---
+
+## Team Commands
+
+### Create Team
+
+```bash
+python cli.py teams create
+```
+
+**Interactive prompts:**
+- Name
+- Slug
+- Organization ID
+- Description (optional)
+
+**With options:**
+```bash
+python cli.py teams create \
+  --name "Engineering Team" \
+  --slug "engineering-team" \
+  --org-id "550e8400-e29b-41d4-a716-446655440000" \
+  --description "Software development team"
+```
+
+### List Teams
+
+```bash
+# List all teams user belongs to
+python cli.py teams list
+
+# List teams in specific organization
+python cli.py teams list --org-id "550e8400-e29b-41d4-a716-446655440000"
+```
+
+### Get Team
+
+```bash
+python cli.py teams get <team-id>
+```
+
+Shows team details including:
+- Team name and slug
+- Organization
+- Member count
+- Description
+- Created/updated timestamps
+
+**Example:**
+```bash
+python cli.py teams get 660e8400-e29b-41d4-a716-446655440000
+```
+
+### Update Team
+
+```bash
+python cli.py teams update <team-id>
+```
+
+**Options:**
+```bash
+# Update name
+python cli.py teams update <team-id> --name "New Team Name"
+
+# Update description
+python cli.py teams update <team-id> --description "Updated description"
+
+# Update both
+python cli.py teams update <team-id> \
+  --name "New Name" \
+  --description "New description"
+```
+
+### Delete Team
+
+```bash
+# Interactive confirmation
+python cli.py teams delete <team-id>
+
+# Skip confirmation
+python cli.py teams delete <team-id> --yes
+```
+
+**Warning:** This will permanently delete the team and remove all member associations.
+
+### Add Member to Team
+
+```bash
+python cli.py teams add-member <team-id>
+```
+
+**Interactive prompt:**
+- User ID
+
+**With options:**
+```bash
+python cli.py teams add-member <team-id> \
+  --user-id "770e8400-e29b-41d4-a716-446655440000"
+```
+
+**Requirements:**
+- User must be a member of the team's organization
+- User cannot already be in the team
+
+### Remove Member from Team
+
+```bash
+python cli.py teams remove-member <team-id>
+```
+
+**Interactive prompt:**
+- User ID
+
+**With options:**
+```bash
+python cli.py teams remove-member <team-id> \
+  --user-id "770e8400-e29b-41d4-a716-446655440000"
+```
+
+### List Team Members
+
+```bash
+python cli.py teams list-members <team-id>
+```
+
+Shows all team members with:
+- User ID
+- Email
+- Full name
+- Role in organization
+
 ---
 
 ## File Commands
@@ -150,10 +497,9 @@ python cli.py files upload ./data/report.xlsx
 ```
 
 **Supported formats:**
-- Documents: PDF, DOCX, TXT, CSV
-- Images: PNG, JPG, GIF, WEBP
-- Archives: ZIP, TAR, GZ
-- Any file type (configurable limit: 50MB default)
+- **Documents:** PDF, DOCX, DOC, XLSX, XLS, TXT, CSV, JSON, Markdown
+- **Images:** PNG, JPG/JPEG, GIF, WEBP
+- **File size limit:** 50MB (configurable via `MAX_FILE_SIZE_MB` in `.env`)
 
 ### List Files
 
@@ -297,9 +643,10 @@ python cli.py health database
 ```
 
 Checks:
-- Connection
-- Query performance
-- Schema version
+- Connection status
+- Query performance (response time in ms)
+- Schema version (current Alembic migration)
+- Connection pool statistics (size, active connections, overflow)
 
 #### Redis
 ```bash
@@ -307,9 +654,10 @@ python cli.py health redis
 ```
 
 Checks:
-- Connection
-- Read/write operations
-- Memory usage
+- Connection status
+- Read/write operations (with performance metrics)
+- Memory usage (used memory, peak memory, fragmentation ratio)
+- Redis version and total keys
 
 #### Celery
 ```bash
@@ -317,9 +665,10 @@ python cli.py health celery
 ```
 
 Checks:
-- Worker count
-- Active tasks
-- Registered tasks
+- Worker count and names
+- Active tasks (currently running)
+- Registered tasks (available task types)
+- Worker availability
 
 #### Storage
 ```bash
@@ -327,9 +676,10 @@ python cli.py health storage
 ```
 
 Checks:
-- Connection
-- Upload/download
-- Available space
+- Connection status
+- Upload/download operations (with performance metrics)
+- Available space (total, used, available for local storage)
+- Storage provider type (S3, local, etc.)
 
 ---
 
@@ -444,7 +794,7 @@ python cli.py auth login \
 python cli.py auth me
 ```
 
-### 2. Organization Setup
+### 2. Organization & Team Setup
 
 ```bash
 # Login
@@ -455,11 +805,25 @@ python cli.py org create \
   --name "My Startup" \
   --slug "my-startup"
 
+# Save the organization ID from response
+ORG_ID="550e8400-e29b-41d4-a716-446655440000"
+
+# Create teams
+python cli.py teams create \
+  --name "Engineering" \
+  --slug "engineering" \
+  --org-id "$ORG_ID"
+
+python cli.py teams create \
+  --name "Marketing" \
+  --slug "marketing" \
+  --org-id "$ORG_ID"
+
+# List teams in organization
+python cli.py teams list --org-id "$ORG_ID"
+
 # Check quota
 python cli.py quota status
-
-# List organizations
-python cli.py org list
 ```
 
 ### 3. File Management
@@ -477,7 +841,37 @@ python cli.py files list
 python cli.py quota status
 ```
 
-### 4. Webhook Setup
+### 4. Team Member Management
+
+```bash
+# Save IDs from previous commands
+ORG_ID="550e8400-e29b-41d4-a716-446655440000"
+TEAM_ID="660e8400-e29b-41d4-a716-446655440000"
+USER_ID="770e8400-e29b-41d4-a716-446655440000"
+
+# Add member to team
+python cli.py teams add-member "$TEAM_ID" \
+  --user-id "$USER_ID"
+
+# List team members
+python cli.py teams list-members "$TEAM_ID"
+
+# Get team details (shows member count)
+python cli.py teams get "$TEAM_ID"
+
+# Update team information
+python cli.py teams update "$TEAM_ID" \
+  --description "Updated team description"
+
+# Remove member from team
+python cli.py teams remove-member "$TEAM_ID" \
+  --user-id "$USER_ID"
+
+# Delete team (with confirmation)
+python cli.py teams delete "$TEAM_ID"
+```
+
+### 5. Webhook Setup
 
 ```bash
 # See available events
@@ -492,7 +886,7 @@ python cli.py webhooks create \
 python cli.py webhooks list
 ```
 
-### 5. System Monitoring
+### 6. System Monitoring
 
 ```bash
 # Check all services

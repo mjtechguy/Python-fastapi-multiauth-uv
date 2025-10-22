@@ -260,7 +260,7 @@ class SessionService:
         Returns:
             Dictionary with session counts
         """
-        from sqlalchemy import func
+        from sqlalchemy import func, Integer
 
         # Get all sessions
         result = await db.execute(

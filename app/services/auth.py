@@ -236,7 +236,14 @@ class AuthService:
             return user, auth_token
 
         except Exception as e:
-            print(f"OAuth authentication error: {e}")
+            from app.core.logging_config import get_logger
+            logger = get_logger(__name__)
+            logger.error(
+                "oauth_authentication_failed",
+                provider=provider,
+                error=str(e),
+                exc_info=True
+            )
             return None, None
 
     @staticmethod
@@ -310,5 +317,11 @@ class AuthService:
             return user, auth_token
 
         except Exception as e:
-            print(f"Keycloak authentication error: {e}")
+            from app.core.logging_config import get_logger
+            logger = get_logger(__name__)
+            logger.error(
+                "keycloak_authentication_failed",
+                error=str(e),
+                exc_info=True
+            )
             return None, None

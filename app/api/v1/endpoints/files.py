@@ -30,12 +30,21 @@ from app.services.storage import storage_service
 from app.core.config import settings
 
 router = APIRouter(prefix="/files", tags=["files"])
-ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
-ALLOWED_DOCUMENT_TYPES = [
+
+# Default allowed file types (used when ALLOWED_FILE_TYPES is not set in .env)
+DEFAULT_ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+DEFAULT_ALLOWED_DOCUMENT_TYPES = [
     "application/pdf",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",  # Excel
+    "application/vnd.ms-excel",  # Excel (old)
+    "text/plain",  # Text files
+    "text/csv",  # CSV files
+    "text/markdown",  # Markdown files
+    "application/json",  # JSON files
 ]
+DEFAULT_ALLOWED_TYPES = DEFAULT_ALLOWED_IMAGE_TYPES + DEFAULT_ALLOWED_DOCUMENT_TYPES
 
 
 @router.post("/upload", response_model=FileUploadResponse, status_code=status.HTTP_201_CREATED)
@@ -43,11 +52,17 @@ async def upload_file(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    organization_id: UUID | None = Query(None, description="Optional organization ID to store file under"),
 ) -> FileModel:
     """
     Upload a file.
 
     Supports images and documents up to configured size limit.
+    File type restrictions can be configured via ALLOWED_FILE_TYPES and BLOCKED_FILE_TYPES in .env
+
+    Files are stored in a hierarchical structure:
+    - With org: uploads/org_<org_id>/user_<user_id>/filename
+    - Without org: uploads/user_<user_id>/filename
     """
     # Validate file size
     content = await file.read()
@@ -62,13 +77,35 @@ async def upload_file(
 
     # Validate file type
     content_type = file.content_type or "application/octet-stream"
-    allowed_types = ALLOWED_IMAGE_TYPES + ALLOWED_DOCUMENT_TYPES
 
-    if not storage_service.validate_file_type(content_type, allowed_types):
+    # Check blocked types first (security)
+    blocked_types = settings.blocked_file_types_list
+    if content_type in blocked_types:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"File type {content_type} not supported",
+            detail=f"File type {content_type} is blocked for security reasons",
         )
+
+    # Get allowed types from configuration
+    allowed_types_config = settings.allowed_file_types_list
+
+    if allowed_types_config is None:
+        # Use default allow list
+        allowed_types = DEFAULT_ALLOWED_TYPES
+    elif allowed_types_config == ["*"]:
+        # Allow all types (except blocked)
+        allowed_types = None  # Skip validation
+    else:
+        # Use custom allow list
+        allowed_types = allowed_types_config
+
+    # Validate against allowed types if not allowing all
+    if allowed_types is not None:
+        if not storage_service.validate_file_type(content_type, allowed_types):
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"File type {content_type} not supported",
+            )
 
     # Create file-like object
     from io import BytesIO
@@ -76,14 +113,35 @@ async def upload_file(
     file_obj = BytesIO(content)
 
     # Optimize images
-    if content_type in ALLOWED_IMAGE_TYPES:
+    if content_type in DEFAULT_ALLOWED_IMAGE_TYPES:
         file_obj = storage_service.optimize_image(file_obj)
         file_size = len(file_obj.getvalue())
 
-    # Upload to storage
+    # Determine organization: use provided one or user's default org
+    from app.services.organization import OrganizationService
+
+    if organization_id:
+        # Verify organization membership if organization_id provided
+        is_member = await OrganizationService.is_member(db, organization_id, current_user.id)
+        if not is_member:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User is not a member of the specified organization",
+            )
+        final_org_id = organization_id
+    else:
+        # Use user's default organization
+        default_org = await OrganizationService.get_or_create_default(db)
+        final_org_id = default_org.id
+
+    # Upload to storage with org/user path structure
     try:
         storage_path, provider, checksum = await storage_service.upload(
-            file_obj, file.filename or "unnamed", content_type
+            file_obj,
+            file.filename or "unnamed",
+            content_type,
+            org_id=str(final_org_id),
+            user_id=str(current_user.id),
         )
 
         # Create database record
@@ -95,6 +153,7 @@ async def upload_file(
             storage_path=storage_path,
             storage_provider=provider,
             uploaded_by_id=current_user.id,
+            organization_id=final_org_id,
             checksum=checksum,
         )
 

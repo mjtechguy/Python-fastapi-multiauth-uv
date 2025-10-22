@@ -39,9 +39,12 @@ class File(Base):
     bucket_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     s3_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
-    # Owner
+    # Owner and organization
     uploaded_by_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
     # Status

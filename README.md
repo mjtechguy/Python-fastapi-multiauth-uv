@@ -25,7 +25,17 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
 
 ### 👥 Multi-Tenancy & RBAC
 
+- **Global Admin System** - First user automatically becomes superuser with full system access
+  - Grant/revoke global admin status to trusted users
+  - Bypasses all permission checks for system-wide operations
+  - CLI and API management: `python cli.py admin grant/revoke`
+  - See [Global Admin Documentation](docs/GLOBAL_ADMIN.md)
 - **Organizations** - Top-level tenant isolation with member management
+  - Default organization automatically created
+  - All users added to default org on registration
+  - **Single-org membership**: Regular users can only belong to one organization (simplifies billing/access)
+  - Global admins can belong to multiple organizations
+  - See [Single Organization Membership](docs/SINGLE_ORG_MEMBERSHIP.md)
 - **Teams** - Sub-groups within organizations for fine-grained access control
 - **Role-Based Access Control (RBAC)** - Dynamic permissions system
 - **Invitation System** - Secure organization invites with expiration
@@ -39,11 +49,17 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
 ### 📁 File Storage & Management
 
 - **Flexible Storage** - S3-compatible storage (AWS S3, MinIO, DigitalOcean Spaces)
+- **Configurable File Types** - Flexible MIME type restrictions via `.env`:
+  - Default mode: Images, documents, text files
+  - Allow all mode: Accept any file type (except executables)
+  - Custom mode: Specify exact MIME types (images, videos, audio, archives, etc.)
+  - Security block list for dangerous file types
 - **File Upload** - Configurable size limits (default 50MB, adjustable via `.env`)
 - **Image Optimization** - Automatic resizing and compression
 - **Presigned URLs** - Secure, temporary download links
 - **Checksum Validation** - SHA256 integrity verification
 - **Metadata Tracking** - File size, type, owner, upload timestamp
+- See [File Upload Configuration Guide](docs/FILE_UPLOAD_CONFIG.md) for detailed setup
 
 ### ⚡ Real-Time & Background Processing
 
@@ -153,9 +169,14 @@ The fastest way to get started - includes **all services** (PostgreSQL, Redis, M
 git clone <repository-url>
 cd Python-fastapi-multiauth-uv
 
-# 2. Copy environment file
+# 2. Copy environment file and configure secrets
 cp .env.example .env
-# Edit .env if needed (defaults work for local development)
+
+# ⚠️ IMPORTANT: Before production use, update these in .env:
+# - SECRET_KEY (generate with: openssl rand -hex 32)
+# - POSTGRES_PASSWORD
+# - MINIO_ROOT_PASSWORD
+# Defaults work for local development only!
 
 # 3. Start all services
 docker-compose up -d
@@ -172,6 +193,11 @@ docker-compose exec api alembic upgrade head
 ```
 
 **That's it!** You now have a complete development environment running.
+
+**🔥 Hot Reload Enabled:** Edit any Python file and see changes instantly! No container rebuild needed.
+- ✅ API auto-reloads on code changes
+- ✅ Celery workers auto-reload
+- ✅ Full development experience
 
 See [docs/DOCKER_COMPOSE.md](docs/DOCKER_COMPOSE.md) for detailed documentation.
 

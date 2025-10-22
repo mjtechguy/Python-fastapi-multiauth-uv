@@ -34,8 +34,8 @@ class FeatureFlag(Base):
     # Example: {"user_ids": [], "organization_ids": [], "user_emails": []}
     targeting_rules: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
-    # Metadata
-    metadata: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    # Extra data
+    extra_data: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

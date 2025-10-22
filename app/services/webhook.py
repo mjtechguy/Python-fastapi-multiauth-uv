@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -179,7 +179,7 @@ class WebhookService:
             "event_data": delivery.event_data,
             "delivery_id": str(delivery.id),
             "webhook_id": str(webhook.id),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
         # Generate signature
@@ -202,17 +202,17 @@ class WebhookService:
                 delivery.status_code = response.status_code
                 delivery.response_body = response.text[:1000]  # Limit response body size
                 delivery.attempt_count += 1
-                delivery.delivered_at = datetime.utcnow()
+                delivery.delivered_at = datetime.now(timezone.utc)
 
                 if 200 <= response.status_code < 300:
                     delivery.status = "success"
                     webhook.successful_deliveries += 1
-                    webhook.last_success_at = datetime.utcnow()
+                    webhook.last_success_at = datetime.now(timezone.utc)
                 else:
                     delivery.status = "failed"
                     delivery.error_message = f"HTTP {response.status_code}"
                     webhook.failed_deliveries += 1
-                    webhook.last_failure_at = datetime.utcnow()
+                    webhook.last_failure_at = datetime.now(timezone.utc)
 
                     # Schedule retry
                     if delivery.attempt_count < delivery.max_attempts:
@@ -220,25 +220,25 @@ class WebhookService:
                         # Exponential backoff: 5min, 30min, 2h
                         retry_delays = [300, 1800, 7200]
                         delay = retry_delays[min(delivery.attempt_count - 1, len(retry_delays) - 1)]
-                        delivery.next_retry_at = datetime.utcnow() + timedelta(seconds=delay)
+                        delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
 
         except Exception as e:
             delivery.status = "failed"
             delivery.error_message = str(e)[:1000]
             delivery.attempt_count += 1
-            delivery.delivered_at = datetime.utcnow()
+            delivery.delivered_at = datetime.now(timezone.utc)
             webhook.failed_deliveries += 1
-            webhook.last_failure_at = datetime.utcnow()
+            webhook.last_failure_at = datetime.now(timezone.utc)
 
             # Schedule retry
             if delivery.attempt_count < delivery.max_attempts:
                 delivery.status = "retrying"
                 retry_delays = [300, 1800, 7200]
                 delay = retry_delays[min(delivery.attempt_count - 1, len(retry_delays) - 1)]
-                delivery.next_retry_at = datetime.utcnow() + timedelta(seconds=delay)
+                delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
 
         webhook.total_deliveries += 1
-        webhook.last_delivery_at = datetime.utcnow()
+        webhook.last_delivery_at = datetime.now(timezone.utc)
         await db.commit()
 
         return delivery.status == "success"

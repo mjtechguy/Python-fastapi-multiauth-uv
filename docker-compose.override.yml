@@ -1,0 +1,60 @@
+# Docker Compose override for development
+# This file is automatically loaded with docker-compose.yml
+# Run: docker-compose up (no extra flags needed!)
+
+version: '3.8'
+
+services:
+  # Override API service for development
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev  # Use dev Dockerfile
+    environment:
+      - LOG_LEVEL=DEBUG
+      - RELOAD=true
+      - PYTHONDONTWRITEBYTECODE=1
+    volumes:
+      # Mount source code for hot reload
+      - .:/app
+      # Exclude these directories to avoid conflicts
+      - /app/.venv
+      - /app/__pycache__
+      - /app/.pytest_cache
+      # Persistent uploads
+      - uploads:/app/uploads
+    # Enable debug mode with more verbose logging
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug --access-log
+
+  # Override Celery Worker for development
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - /app/.venv
+      - /app/__pycache__
+      - uploads:/app/uploads
+    # Auto-reload celery worker on code changes
+    command: watchfiles "celery -A app.tasks.celery_app worker --loglevel=debug" app/
+
+  # Override Celery Beat for development
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - /app/.venv
+      - /app/__pycache__
+    # Auto-reload beat on code changes
+    command: watchfiles "celery -A app.tasks.celery_app beat --loglevel=debug" app/
+
+  # Override Flower for development
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    # Enable more verbose logging
+    command: celery -A app.tasks.celery_app flower --port=5555 --logging=debug

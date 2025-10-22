@@ -53,18 +53,17 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: RedisDsn
 
     # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: str = "http://localhost:3000"
     CORS_ALLOW_CREDENTIALS: bool = True
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def assemble_cors_origins(cls, v: str | list[str]) -> list[str] | str:
-        """Parse CORS origins from comma-separated string or list."""
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
+    def get_cors_origins(self) -> list[str]:
+        """Get CORS origins as a list."""
+        if not self.CORS_ORIGINS:
+            return ["http://localhost:3000"]
+        if isinstance(self.CORS_ORIGINS, list):
+            return self.CORS_ORIGINS
+        # Parse comma-separated string
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
     # OAuth2 - Google
     GOOGLE_CLIENT_ID: str = ""
@@ -122,6 +121,10 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-1"
     AWS_ENDPOINT_URL: str = ""  # For MinIO or other S3-compatible services
 
+    # File Upload Restrictions
+    ALLOWED_FILE_TYPES: str = ""  # Comma-separated MIME types, or "*" for all types
+    BLOCKED_FILE_TYPES: str = "application/x-executable,application/x-dosexec,application/x-msdos-program"  # Security: block executables
+
     @property
     def is_production(self) -> bool:
         """Check if running in production environment."""
@@ -131,6 +134,28 @@ class Settings(BaseSettings):
     def database_url_sync(self) -> str:
         """Get synchronous database URL for Alembic."""
         return str(self.DATABASE_URL).replace("+asyncpg", "")
+
+    @property
+    def allowed_file_types_list(self) -> list[str] | None:
+        """Get list of allowed file types from comma-separated string.
+
+        Returns:
+            - None if ALLOWED_FILE_TYPES is empty (use default allow list)
+            - ["*"] if ALLOWED_FILE_TYPES is "*" (allow all types)
+            - List of MIME types otherwise
+        """
+        if not self.ALLOWED_FILE_TYPES:
+            return None
+        if self.ALLOWED_FILE_TYPES.strip() == "*":
+            return ["*"]
+        return [mime.strip() for mime in self.ALLOWED_FILE_TYPES.split(",") if mime.strip()]
+
+    @property
+    def blocked_file_types_list(self) -> list[str]:
+        """Get list of blocked file types from comma-separated string."""
+        if not self.BLOCKED_FILE_TYPES:
+            return []
+        return [mime.strip() for mime in self.BLOCKED_FILE_TYPES.split(",") if mime.strip()]
 
 
 settings = Settings()

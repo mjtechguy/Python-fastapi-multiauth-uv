@@ -53,13 +53,18 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency for getting async database sessions.
 
+    NOTE: This dependency does NOT auto-commit transactions.
+    Endpoints must explicitly call `await db.commit()` to persist changes.
+    This provides better transaction control and makes commits explicit.
+
     Yields:
         AsyncSession: Database session
     """
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
+            # Removed auto-commit - endpoints must commit explicitly
+            # This provides better transaction control
         except Exception:
             await session.rollback()
             raise

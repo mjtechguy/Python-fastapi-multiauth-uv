@@ -6,8 +6,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps.auth import get_current_user
-from app.api.deps.db import get_db
+from app.api.v1.dependencies import get_current_user
+from app.db.session import get_db
 from app.models.user import User
 from app.schemas.quota import (
     QuotaStatus,
@@ -20,7 +20,7 @@ from app.schemas.quota import (
 )
 from app.services.quota import QuotaService
 
-router = APIRouter()
+router = APIRouter(prefix="/quota", tags=["quota"])
 
 
 @router.get("/status", response_model=QuotaStatus)
@@ -29,10 +29,15 @@ async def get_quota_status(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> QuotaStatus:
     """Get current quota status for user's organization."""
-    if not hasattr(current_user, 'organization_id') or not current_user.organization_id:
+    # Get user's organization (users can only be in one org)
+    from app.services.organization import OrganizationService
+
+    orgs, _ = await OrganizationService.list_user_organizations(db, current_user.id, limit=1)
+
+    if not orgs:
         raise HTTPException(status_code=400, detail="User does not belong to an organization")
 
-    organization_id = current_user.organization_id
+    organization_id = orgs[0].id
     quota = await QuotaService.get_or_create_quota(db, organization_id)
 
     # Reset quotas if needed
@@ -77,13 +82,18 @@ async def update_quota_limits(
     Update quota limits for user's organization.
     Requires admin/owner permissions.
     """
-    if not hasattr(current_user, 'organization_id') or not current_user.organization_id:
+    # Get user's organization
+    from app.services.organization import OrganizationService
+
+    orgs, _ = await OrganizationService.list_user_organizations(db, current_user.id, limit=1)
+
+    if not orgs:
         raise HTTPException(status_code=400, detail="User does not belong to an organization")
 
     # TODO: Add permission check - only org admins/owners should be able to update quotas
     # For now, allowing any authenticated user
 
-    organization_id = current_user.organization_id
+    organization_id = orgs[0].id
 
     # Update limits
     quota = await QuotaService.update_limits(
@@ -114,10 +124,15 @@ async def get_usage_logs(
     user_id: uuid.UUID | None = Query(None, description="Filter by user ID"),
 ) -> UsageLogListResponse:
     """Get usage logs for user's organization."""
-    if not hasattr(current_user, 'organization_id') or not current_user.organization_id:
+    # Get user's organization (users can only be in one org)
+    from app.services.organization import OrganizationService
+
+    orgs, _ = await OrganizationService.list_user_organizations(db, current_user.id, limit=1)
+
+    if not orgs:
         raise HTTPException(status_code=400, detail="User does not belong to an organization")
 
-    organization_id = current_user.organization_id
+    organization_id = orgs[0].id
 
     logs, total = await QuotaService.get_usage_logs(
         db,
@@ -135,7 +150,7 @@ async def get_usage_logs(
                 organization_id=log.organization_id,
                 user_id=log.user_id,
                 usage_type=log.usage_type,
-                metadata=log.metadata,
+                metadata=log.extra_data,
                 created_at=log.created_at,
             )
             for log in logs

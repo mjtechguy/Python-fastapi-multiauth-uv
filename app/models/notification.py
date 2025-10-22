@@ -44,7 +44,7 @@ class Notification(Base):
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Additional data
-    metadata: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    extra_data: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

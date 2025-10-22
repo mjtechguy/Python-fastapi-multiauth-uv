@@ -120,20 +120,34 @@ class UserService:
 
     @staticmethod
     async def list_users(
-        db: AsyncSession, skip: int = 0, limit: int = 100
+        db: AsyncSession, skip: int = 0, limit: int = 100, is_superuser: bool | None = None
     ) -> tuple[list[User], int]:
-        """List users with pagination."""
+        """List users with pagination.
+
+        Args:
+            db: Database session
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+            is_superuser: Filter by superuser status (None = no filter)
+
+        Returns:
+            Tuple of (users list, total count)
+        """
+        # Build base query
+        query = select(User).options(selectinload(User.roles))
+        count_query = select(func.count(User.id))
+
+        # Apply superuser filter if specified
+        if is_superuser is not None:
+            query = query.where(User.is_superuser == is_superuser)
+            count_query = count_query.where(User.is_superuser == is_superuser)
+
         # Get total count
-        count_result = await db.execute(select(func.count(User.id)))
+        count_result = await db.execute(count_query)
         total = count_result.scalar_one()
 
         # Get paginated results
-        result = await db.execute(
-            select(User)
-            .options(selectinload(User.roles))
-            .offset(skip)
-            .limit(limit)
-        )
+        result = await db.execute(query.offset(skip).limit(limit))
         users = result.scalars().all()
 
         return list(users), total

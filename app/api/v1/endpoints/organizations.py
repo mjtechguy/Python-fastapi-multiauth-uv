@@ -18,6 +18,7 @@ from app.schemas.organization import (
     AddMemberRequest,
     RemoveMemberRequest,
 )
+from app.schemas.user import UserResponse
 from app.services.organization import OrganizationService
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
@@ -150,7 +151,11 @@ async def add_member(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> dict[str, str]:
-    """Add member to organization."""
+    """Add member to organization.
+
+    Note: Regular users can only be members of one organization at a time.
+    Global admins (superusers) can belong to multiple organizations.
+    """
     org = await OrganizationService.get_by_id(db, org_id)
 
     if not org:
@@ -165,8 +170,14 @@ async def add_member(
             detail="Only organization owner can add members",
         )
 
-    await OrganizationService.add_member(db, org_id, member_request.user_id)
-    await db.commit()
+    try:
+        await OrganizationService.add_member(db, org_id, member_request.user_id)
+        await db.commit()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
 
     return {"message": "Member added successfully"}
 
@@ -195,3 +206,31 @@ async def remove_member(
 
     await OrganizationService.remove_member(db, org_id, member_request.user_id)
     await db.commit()
+
+
+@router.get("/{org_id}/members", response_model=list[UserResponse])
+async def list_members(
+    org_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> list[User]:
+    """List all members of an organization."""
+    org = await OrganizationService.get_by_id(db, org_id)
+
+    if not org:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found",
+        )
+
+    # Check if user is a member of the organization
+    is_member = await OrganizationService.is_member(db, org_id, current_user.id)
+    if not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this organization",
+        )
+
+    # Get all members
+    members = await OrganizationService.list_members(db, org_id)
+    return members

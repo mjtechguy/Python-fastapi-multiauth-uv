@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, organizations, health, websocket, totp, files, sessions, quota, webhooks, dead_letter
+from app.api.v1.endpoints import auth, users, organizations, teams, health, websocket, totp, files, sessions, quota, webhooks, dead_letter
 
 api_router = APIRouter()
 
@@ -11,6 +11,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(users.router)
 api_router.include_router(organizations.router)
+api_router.include_router(teams.router)
 api_router.include_router(totp.router)
 api_router.include_router(files.router)
 api_router.include_router(sessions.router)

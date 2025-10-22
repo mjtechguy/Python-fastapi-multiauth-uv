@@ -6,8 +6,8 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps.db import get_db
-from app.api.deps.auth import get_current_user
+from app.db.session import get_db
+from app.api.v1.dependencies import get_current_user
 from app.models.user import User
 from app.models.quota import OrganizationQuota
 from app.services.quota import QuotaService

@@ -8,7 +8,17 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use Argon2id - the most secure variant of Argon2
+# - time_cost: Number of iterations (default 2, we use 3 for more security)
+# - memory_cost: Memory usage in KiB (default 102400 = 100MB, we use 65536 = 64MB for balance)
+# - parallelism: Number of parallel threads (default 8)
+pwd_context = CryptContext(
+    schemes=["argon2"],
+    deprecated="auto",
+    argon2__time_cost=3,
+    argon2__memory_cost=65536,
+    argon2__parallelism=4,
+)
 
 
 def create_access_token(subject: str | Any, expires_delta: timedelta | None = None) -> str:

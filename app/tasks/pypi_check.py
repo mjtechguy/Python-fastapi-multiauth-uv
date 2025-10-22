@@ -1,10 +1,13 @@
 """PyPI package version checking tasks."""
 
 import httpx
-import toml
+import re
 from pathlib import Path
 
 from app.tasks.celery_app import celery_app
+from app.core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 @celery_app.task
@@ -18,10 +21,23 @@ def check_package_versions() -> dict[str, dict[str, str]]:
     try:
         # Read pyproject.toml
         pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
-        with open(pyproject_path, "r") as f:
-            pyproject_data = toml.load(f)
+        content = pyproject_path.read_text()
 
-        dependencies = pyproject_data.get("project", {}).get("dependencies", [])
+        # Parse dependencies manually (no external toml library needed)
+        dependencies = []
+        in_deps = False
+        for line in content.split('\n'):
+            if 'dependencies = [' in line:
+                in_deps = True
+                continue
+            if in_deps:
+                if ']' in line:
+                    break
+                if line.strip() and line.strip().startswith('"'):
+                    # Extract dependency from quoted string
+                    match = re.search(r'"([^"]+)"', line)
+                    if match:
+                        dependencies.append(match.group(1))
         outdated_packages = {}
 
         for dep in dependencies:
@@ -54,17 +70,27 @@ def check_package_versions() -> dict[str, dict[str, str]]:
                             }
 
             except Exception as e:
-                print(f"Error checking {package_name}: {e}")
+                logger.warning(
+                    "package_check_failed",
+                    package=package_name,
+                    error=str(e)
+                )
                 continue
 
         # Log results
         if outdated_packages:
-            print(f"Found {len(outdated_packages)} packages with updates:")
-            for pkg, versions in outdated_packages.items():
-                print(f"  {pkg}: {versions['current']} -> {versions['latest']}")
+            logger.info(
+                "packages_with_updates_found",
+                count=len(outdated_packages),
+                packages=outdated_packages
+            )
 
         return outdated_packages
 
     except Exception as e:
-        print(f"Error checking package versions: {e}")
+        logger.error(
+            "package_version_check_failed",
+            error=str(e),
+            exc_info=True
+        )
         return {}

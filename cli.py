@@ -79,7 +79,8 @@ def print_response(response: httpx.Response):
         console.print("\n[yellow]Response:[/yellow]")
         syntax = Syntax(json.dumps(data, indent=2), "json", theme="monokai")
         console.print(syntax)
-    except:
+    except (json.JSONDecodeError, ValueError) as e:
+        # Response is not JSON, print as text
         console.print(f"\n[yellow]Response:[/yellow]\n{response.text}")
 
 
@@ -103,13 +104,25 @@ app.add_typer(auth_app, name="auth")
 
 @auth_app.command()
 def register(
-    email: str = typer.Option(..., "--email", "-e", prompt=True),
-    password: str = typer.Option(..., "--password", "-p", prompt=True, hide_input=True),
-    full_name: str = typer.Option(..., "--name", "-n", prompt=True),
+    email: str = typer.Option(None, "--email", "-e"),
+    password: str = typer.Option(None, "--password", "-p"),
+    full_name: str = typer.Option(None, "--name", "-n"),
     base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
 ):
-    """Register a new user."""
+    """Register a new user.
+
+    Can be used interactively (prompts for values) or with command-line arguments.
+    First user registered automatically becomes a superuser (global admin).
+    """
     console.print("\n[bold cyan]🚀 Registering new user...[/bold cyan]\n")
+
+    # Prompt for missing values
+    if not email:
+        email = typer.prompt("Email")
+    if not password:
+        password = typer.prompt("Password", hide_input=True)
+    if not full_name:
+        full_name = typer.prompt("Full name")
 
     data = {
         "email": email,
@@ -122,7 +135,13 @@ def register(
         print_response(response)
 
         if response.status_code == 201:
+            result = response.json()
             print_success("User registered successfully!")
+
+            # Check if this user is a superuser (first user)
+            if result.get("is_superuser"):
+                console.print("\n[bold green]👑 This is the first user - granted Global Admin (superuser) status![/bold green]")
+                console.print("[dim]You have full system access. Use 'python cli.py admin' commands to manage other admins.[/dim]\n")
 
 
 @auth_app.command()
@@ -134,10 +153,15 @@ def login(
     """Login and save access token."""
     console.print("\n[bold cyan]🔑 Logging in...[/bold cyan]\n")
 
+    data = {
+        "email": email,
+        "password": password
+    }
+
     with httpx.Client(base_url=base_url) as client:
         response = client.post(
             "/api/v1/auth/login",
-            data={"username": email, "password": password}
+            json=data
         )
         print_response(response)
 
@@ -242,6 +266,218 @@ def get(
         print_response(response)
 
 
+@org_app.command("add-member")
+def add_org_member(
+    org_id: str = typer.Argument(..., help="Organization ID"),
+    user_id: str = typer.Option(..., "--user-id", "-u", prompt=True),
+    role: str = typer.Option("member", "--role", "-r", help="Role: owner, admin, or member"),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """Add a member to an organization."""
+    console.print(f"\n[bold cyan]➕ Adding member to organization {org_id}...[/bold cyan]\n")
+
+    data = {
+        "user_id": user_id,
+        "role": role
+    }
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.post(f"/api/v1/organizations/{org_id}/members", json=data)
+        print_response(response)
+
+        if response.status_code == 201:
+            print_success(f"Member added to organization with role: {role}")
+
+
+@org_app.command("remove-member")
+def remove_org_member(
+    org_id: str = typer.Argument(..., help="Organization ID"),
+    user_id: str = typer.Option(..., "--user-id", "-u", prompt=True),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """Remove a member from an organization."""
+    console.print(f"\n[bold cyan]➖ Removing member from organization {org_id}...[/bold cyan]\n")
+
+    data = {"user_id": user_id}
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.delete(f"/api/v1/organizations/{org_id}/members", json=data)
+        print_response(response)
+
+        if response.status_code == 204:
+            print_success("Member removed from organization")
+
+
+@org_app.command("list-members")
+def list_org_members(
+    org_id: str = typer.Argument(..., help="Organization ID"),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """List all members of an organization."""
+    console.print(f"\n[bold cyan]👥 Listing members of organization {org_id}...[/bold cyan]\n")
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.get(f"/api/v1/organizations/{org_id}/members")
+        print_response(response)
+
+
+# ============================================================================
+# Team Commands
+# ============================================================================
+
+teams_app = typer.Typer(help="Team management")
+app.add_typer(teams_app, name="teams")
+
+
+@teams_app.command()
+def create(
+    name: str = typer.Option(..., "--name", "-n", prompt=True),
+    slug: str = typer.Option(..., "--slug", "-s", prompt=True),
+    org_id: str = typer.Option(..., "--org-id", "-o", prompt=True),
+    description: str = typer.Option("", "--description", "-d"),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """Create a new team."""
+    console.print("\n[bold cyan]👥 Creating team...[/bold cyan]\n")
+
+    data = {
+        "name": name,
+        "slug": slug,
+        "organization_id": org_id,
+        "description": description
+    }
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.post("/api/v1/teams", json=data)
+        print_response(response)
+
+
+@teams_app.command("list")
+def list_teams(
+    org_id: str = typer.Option(None, "--org-id", "-o", help="Filter by organization ID"),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url")
+):
+    """List teams."""
+    console.print("\n[bold cyan]📋 Listing teams...[/bold cyan]\n")
+
+    params = {}
+    if org_id:
+        params["organization_id"] = org_id
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.get("/api/v1/teams", params=params)
+        print_response(response)
+
+
+@teams_app.command()
+def get(
+    team_id: str = typer.Argument(..., help="Team ID"),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """Get team details."""
+    console.print(f"\n[bold cyan]🔍 Getting team {team_id}...[/bold cyan]\n")
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.get(f"/api/v1/teams/{team_id}")
+        print_response(response)
+
+
+@teams_app.command()
+def update(
+    team_id: str = typer.Argument(..., help="Team ID"),
+    name: str = typer.Option(None, "--name", "-n"),
+    description: str = typer.Option(None, "--description", "-d"),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """Update team."""
+    console.print(f"\n[bold cyan]✏️  Updating team {team_id}...[/bold cyan]\n")
+
+    data = {}
+    if name:
+        data["name"] = name
+    if description:
+        data["description"] = description
+
+    if not data:
+        print_error("No update data provided")
+        return
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.put(f"/api/v1/teams/{team_id}", json=data)
+        print_response(response)
+
+
+@teams_app.command()
+def delete(
+    team_id: str = typer.Argument(..., help="Team ID"),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """Delete a team."""
+    if not confirm:
+        confirmed = typer.confirm(f"Are you sure you want to delete team {team_id}?")
+        if not confirmed:
+            console.print("[yellow]Aborted[/yellow]")
+            return
+
+    console.print(f"\n[bold cyan]🗑️  Deleting team {team_id}...[/bold cyan]\n")
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.delete(f"/api/v1/teams/{team_id}")
+        if response.status_code == 204:
+            print_success("Team deleted successfully")
+        else:
+            print_response(response)
+
+
+@teams_app.command("add-member")
+def add_member(
+    team_id: str = typer.Argument(..., help="Team ID"),
+    user_id: str = typer.Option(..., "--user-id", "-u", prompt=True),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """Add a member to a team."""
+    console.print(f"\n[bold cyan]➕ Adding member to team {team_id}...[/bold cyan]\n")
+
+    data = {"user_id": user_id}
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.post(f"/api/v1/teams/{team_id}/members", json=data)
+        print_response(response)
+
+
+@teams_app.command("remove-member")
+def remove_member(
+    team_id: str = typer.Argument(..., help="Team ID"),
+    user_id: str = typer.Option(..., "--user-id", "-u", prompt=True),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """Remove a member from a team."""
+    console.print(f"\n[bold cyan]➖ Removing member from team {team_id}...[/bold cyan]\n")
+
+    data = {"user_id": user_id}
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.delete(f"/api/v1/teams/{team_id}/members", json=data)
+        if response.status_code == 204:
+            print_success("Member removed successfully")
+        else:
+            print_response(response)
+
+
+@teams_app.command("list-members")
+def list_members(
+    team_id: str = typer.Argument(..., help="Team ID"),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """List team members."""
+    console.print(f"\n[bold cyan]👥 Listing members of team {team_id}...[/bold cyan]\n")
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.get(f"/api/v1/teams/{team_id}/members")
+        print_response(response)
+
+
 # ============================================================================
 # File Commands
 # ============================================================================
@@ -253,9 +489,15 @@ app.add_typer(files_app, name="files")
 @files_app.command()
 def upload(
     file_path: Path = typer.Argument(..., help="Path to file"),
+    organization_id: str = typer.Option(None, "--org-id", "-o", help="Organization ID to store file under"),
     base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
 ):
-    """Upload a file."""
+    """Upload a file.
+
+    Files are organized by user and optionally by organization:
+    - With --org-id: stores in uploads/org_<org_id>/user_<user_id>/
+    - Without --org-id: stores in uploads/user_<user_id>/
+    """
     if not file_path.exists():
         print_error(f"File not found: {file_path}")
         raise typer.Exit(1)
@@ -265,7 +507,10 @@ def upload(
     with httpx.Client(base_url=base_url, headers=get_headers(), timeout=60) as client:
         with open(file_path, "rb") as f:
             files = {"file": (file_path.name, f)}
-            response = client.post("/api/v1/files/upload", files=files)
+            params = {}
+            if organization_id:
+                params["organization_id"] = organization_id
+            response = client.post("/api/v1/files/upload", files=files, params=params)
             print_response(response)
 
 
@@ -385,6 +630,56 @@ def logs(
 
     with httpx.Client(base_url=base_url, headers=get_headers()) as client:
         response = client.get(f"/api/v1/quota/usage-logs?page={page}&page_size={page_size}")
+        print_response(response)
+
+
+# ============================================================================
+# Admin Commands (Superuser Management)
+# ============================================================================
+
+admin_app = typer.Typer(help="Global admin (superuser) management")
+app.add_typer(admin_app, name="admin")
+
+
+@admin_app.command("grant")
+def grant_superuser(
+    user_id: str = typer.Argument(..., help="User ID to grant superuser status"),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """Grant global admin (superuser) status to a user.
+
+    Only existing superusers can grant superuser status to others.
+    """
+    console.print(f"\n[bold cyan]👑 Granting superuser status to user {user_id}...[/bold cyan]\n")
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.post(f"/api/v1/users/{user_id}/superuser")
+        print_response(response)
+
+
+@admin_app.command("revoke")
+def revoke_superuser(
+    user_id: str = typer.Argument(..., help="User ID to revoke superuser status"),
+    base_url: str = typer.Option(DEFAULT_BASE_URL, "--url"),
+):
+    """Revoke global admin (superuser) status from a user.
+
+    Only existing superusers can revoke superuser status.
+    """
+    console.print(f"\n[bold red]👑 Revoking superuser status from user {user_id}...[/bold red]\n")
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.delete(f"/api/v1/users/{user_id}/superuser")
+        print_response(response)
+
+
+@admin_app.command("list")
+def list_superusers(base_url: str = typer.Option(DEFAULT_BASE_URL, "--url")):
+    """List all global admins (superusers)."""
+    console.print("\n[bold cyan]👑 Listing all superusers...[/bold cyan]\n")
+
+    with httpx.Client(base_url=base_url, headers=get_headers()) as client:
+        response = client.get("/api/v1/users?is_superuser=true")
         print_response(response)
 
 

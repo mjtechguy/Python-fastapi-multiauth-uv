@@ -38,7 +38,7 @@ class AuditLog(Base):
     user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Additional context
-    metadata: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    extra_data: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
     # Result
     status: Mapped[str] = mapped_column(String(20), nullable=False)  # success, failure, error

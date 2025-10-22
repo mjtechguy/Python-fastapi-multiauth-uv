@@ -1,13 +1,13 @@
 """Middleware for graceful shutdown handling."""
 
-import logging
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 from app.core.graceful_shutdown import shutdown_handler
+from app.core.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class GracefulShutdownMiddleware(BaseHTTPMiddleware):
@@ -31,7 +31,11 @@ class GracefulShutdownMiddleware(BaseHTTPMiddleware):
         """
         # Reject new requests during shutdown
         if shutdown_handler.is_shutting_down:
-            logger.warning(f"Rejecting new request to {request.url.path} - server is shutting down")
+            logger.warning(
+                "request_rejected_shutdown",
+                path=str(request.url.path),
+                method=request.method
+            )
             return Response(
                 content="Server is shutting down, please try again later",
                 status_code=503,
@@ -40,7 +44,11 @@ class GracefulShutdownMiddleware(BaseHTTPMiddleware):
 
         # Track active requests
         shutdown_handler.active_requests += 1
-        logger.debug(f"Request started: {request.url.path} (active: {shutdown_handler.active_requests})")
+        logger.debug(
+            "request_started",
+            path=str(request.url.path),
+            active_count=shutdown_handler.active_requests
+        )
 
         try:
             response = await call_next(request)
@@ -49,5 +57,7 @@ class GracefulShutdownMiddleware(BaseHTTPMiddleware):
             # Decrement active request counter
             shutdown_handler.active_requests -= 1
             logger.debug(
-                f"Request completed: {request.url.path} (active: {shutdown_handler.active_requests})"
+                "request_completed",
+                path=str(request.url.path),
+                active_count=shutdown_handler.active_requests
             )

@@ -69,7 +69,31 @@ async def register(
 
     # Create user
     user = await UserService.create(db, user_in)
-    await db.commit()
+    await db.flush()
+
+    # Check if this is the first user - make them superuser (global admin)
+    from sqlalchemy import select, func
+
+    user_count = await db.execute(select(func.count(User.id)))
+    total_users = user_count.scalar_one()
+
+    if total_users == 1:
+        # First user becomes superuser (global admin)
+        user.is_superuser = True
+        await db.flush()
+
+    # Add user to default organization
+    from app.services.organization import OrganizationService
+
+    default_org = await OrganizationService.get_or_create_default(db)
+
+    # Set owner_id if this is the first user
+    if default_org.owner_id is None:
+        default_org.owner_id = user.id
+        await db.flush()
+
+    # Add user as member
+    await OrganizationService.add_member(db, default_org.id, user.id)
 
     # Create email verification token and send email
     from app.models.token import EmailVerificationToken
@@ -171,22 +195,39 @@ async def get_current_user_info(
 @router.get("/oauth/{provider}/authorize", response_model=OAuthURLResponse)
 async def oauth_authorize(provider: str) -> OAuthURLResponse:
     """
-    Get OAuth authorization URL for provider.
+    Get OAuth authorization URL for provider with CSRF protection.
+
+    Generates a secure state parameter that is stored in Redis with 10-minute expiration.
+    The state must be validated in the callback to prevent CSRF attacks.
 
     Args:
         provider: OAuth provider name (google, github, microsoft)
 
     Returns:
-        Authorization URL
+        Authorization URL with state parameter
 
     Raises:
         HTTPException: If provider is not supported
     """
+    import secrets
+    from app.services.cache import cache
+
     try:
+        # Generate secure random state for CSRF protection
+        state = secrets.token_urlsafe(32)
+
+        # Store state in Redis with 10-minute expiration
+        await cache.set(f"oauth_state:{state}", provider, ex=600)
+
+        # Get OAuth client and create authorization URL
         client = await AuthService.get_oauth_client(provider)
         authorize_url = AuthService.get_oauth_authorize_url(provider)
 
-        authorization_url, _ = client.create_authorization_url(authorize_url)
+        # Include state parameter in OAuth URL
+        authorization_url, _ = client.create_authorization_url(
+            authorize_url,
+            state=state
+        )
 
         return OAuthURLResponse(authorization_url=authorization_url)
 
@@ -204,19 +245,57 @@ async def oauth_callback(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Token:
     """
-    Handle OAuth callback and authenticate user.
+    Handle OAuth callback and authenticate user with CSRF protection.
+
+    Validates the state parameter to ensure the request originated from our
+    authorization endpoint, preventing CSRF attacks.
 
     Args:
         provider: OAuth provider name
-        callback: OAuth callback data
+        callback: OAuth callback data (code and state)
         db: Database session
 
     Returns:
         Access and refresh tokens
 
     Raises:
-        HTTPException: If authentication fails
+        HTTPException: If state validation fails or authentication fails
     """
+    from app.services.cache import cache
+    from app.core.logging_config import get_logger
+
+    logger = get_logger(__name__)
+
+    # Validate state parameter (CSRF protection)
+    cached_provider = await cache.get(f"oauth_state:{callback.state}")
+
+    if not cached_provider:
+        logger.warning(
+            "oauth_csrf_invalid_state",
+            provider=provider,
+            state_exists=False
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired state parameter. Please try again.",
+        )
+
+    # Verify provider matches
+    if cached_provider.decode('utf-8') != provider:
+        logger.warning(
+            "oauth_csrf_provider_mismatch",
+            expected_provider=cached_provider.decode('utf-8'),
+            received_provider=provider
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provider mismatch. Possible CSRF attack detected.",
+        )
+
+    # Delete state after successful validation (one-time use)
+    await cache.delete(f"oauth_state:{callback.state}")
+
+    # Proceed with OAuth authentication
     user, token = await AuthService.authenticate_oauth(db, provider, callback.code)
 
     if not user or not token:
@@ -224,6 +303,12 @@ async def oauth_callback(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="OAuth authentication failed",
         )
+
+    logger.info(
+        "oauth_authentication_successful",
+        provider=provider,
+        user_id=str(user.id)
+    )
 
     return token
 

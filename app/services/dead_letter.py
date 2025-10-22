@@ -1,7 +1,7 @@
 """Service for managing dead letter queue."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from sqlalchemy import select, func
@@ -91,7 +91,7 @@ class DeadLetterService:
         task.status = "resolved"
         task.resolution_notes = resolution_notes
         task.resolved_by = resolved_by
-        task.resolved_at = datetime.utcnow()
+        task.resolved_at = datetime.now(timezone.utc)
 
         await db.commit()
         await db.refresh(task)
@@ -145,10 +145,9 @@ class DeadLetterService:
         by_status = {row[0]: row[1] for row in status_result.all()}
 
         # Recent failures (last 24 hours)
-        from datetime import timedelta
         recent_result = await db.execute(
             select(func.count(DeadLetterTask.id))
-            .where(DeadLetterTask.failed_at >= datetime.utcnow() - timedelta(hours=24))
+            .where(DeadLetterTask.failed_at >= datetime.now(timezone.utc) - timedelta(hours=24))
         )
         recent = recent_result.scalar_one()
 

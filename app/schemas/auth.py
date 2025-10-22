@@ -35,7 +35,7 @@ class OAuthCallback(BaseModel):
     """OAuth callback schema."""
 
     code: str
-    state: str | None = None
+    state: str  # Required for CSRF protection
 
 
 class OAuthURLResponse(BaseModel):

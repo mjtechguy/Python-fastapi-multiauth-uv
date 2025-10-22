@@ -1,8 +1,10 @@
 """Celery application configuration."""
 
 from celery import Celery
+from celery.signals import worker_process_init
 
 from app.core.config import settings
+from app.core.logging_config import configure_logging
 
 celery_app = Celery(
     "saas_backend",
@@ -10,6 +12,12 @@ celery_app = Celery(
     backend=str(settings.CELERY_RESULT_BACKEND),
     include=["app.tasks.email", "app.tasks.pypi_check", "app.tasks.webhook"],
 )
+
+
+@worker_process_init.connect
+def configure_worker_logging(**kwargs):
+    """Configure structlog for Celery workers."""
+    configure_logging()
 
 celery_app.conf.update(
     task_serializer="json",
@@ -36,9 +44,10 @@ celery_app.conf.update(
 
 # Celery signal handlers for application-level DLQ
 from celery import signals
-import logging
 
-logger = logging.getLogger(__name__)
+from app.core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 @signals.task_failure.connect
@@ -49,48 +58,57 @@ def handle_task_failure(sender=None, task_id=None, exception=None, args=None, kw
     Logs failed tasks to database after all retries are exhausted.
 
     This is triggered when a task fails completely (after max retries).
+
+    NOTE: Uses synchronous database connection to avoid asyncio.run() issues
+    in signal handlers (creating new event loops can cause crashes).
     """
-    import asyncio
-    from app.db.session import AsyncSessionLocal
-    from app.services.dead_letter import DeadLetterService
+    from datetime import datetime, timezone
+    from app.db.session import SyncSessionLocal
+    from app.models.dead_letter import DeadLetterTask
 
     # Get retry count from task state
     task = sender
     retry_count = getattr(task.request, 'retries', 0) if hasattr(task, 'request') else 0
 
     logger.error(
-        f"Task {task_id} failed after {retry_count} retries: {exception}",
-        extra={
-            "task_id": task_id,
-            "task_name": sender.name if sender else "unknown",
-            "exception": str(exception),
-            "args": args,
-            "kwargs": kwargs,
-        }
+        "task_failed_after_retries",
+        task_id=task_id,
+        task_name=sender.name if sender else "unknown",
+        retry_count=retry_count,
+        exception_type=type(exception).__name__,
+        exception_message=str(exception),
+        task_args=args,
+        task_kwargs=kwargs,
     )
 
-    # Store in database for admin review
-    async def store_failure():
-        try:
-            async with AsyncSessionLocal() as db:
-                await DeadLetterService.create_dead_letter_task(
-                    db=db,
-                    task_id=task_id,
-                    task_name=sender.name if sender else "unknown",
-                    exception=str(exception),
-                    traceback=str(einfo) if einfo else str(traceback),
-                    task_args=list(args) if args else None,
-                    task_kwargs=dict(kwargs) if kwargs else None,
-                    retry_count=retry_count,
-                )
-        except Exception as e:
-            logger.error(f"Failed to store task failure in database: {e}")
-
-    # Run async function
+    # Store in database for admin review (synchronous to avoid asyncio.run() issues)
     try:
-        asyncio.run(store_failure())
+        with SyncSessionLocal() as db:
+            dead_letter = DeadLetterTask(
+                task_id=task_id,
+                task_name=sender.name if sender else "unknown",
+                exception=str(exception),
+                traceback=str(einfo) if einfo else str(traceback),
+                task_args=list(args) if args else None,
+                task_kwargs=dict(kwargs) if kwargs else None,
+                retry_count=retry_count,
+                status="failed",
+                failed_at=datetime.now(timezone.utc),
+            )
+            db.add(dead_letter)
+            db.commit()
+            logger.info(
+                "task_logged_to_dlq",
+                task_id=task_id,
+                dlq_id=str(dead_letter.id)
+            )
     except Exception as e:
-        logger.error(f"Error storing dead letter task: {e}")
+        logger.error(
+            "dlq_storage_failed",
+            task_id=task_id,
+            error=str(e),
+            exc_info=True
+        )
 
 # Periodic tasks schedule
 celery_app.conf.beat_schedule = {

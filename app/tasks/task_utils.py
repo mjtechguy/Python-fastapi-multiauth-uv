@@ -1,11 +1,12 @@
 """Helper utilities for Celery tasks with DLQ support."""
 
-import logging
 from typing import Any, Callable
 from functools import wraps
 from celery import Task
 
-logger = logging.getLogger(__name__)
+from app.core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def task_with_dlq(max_retries: int = 3, retry_delay: int = 60):
@@ -38,23 +39,22 @@ def task_with_dlq(max_retries: int = 3, retry_delay: int = 60):
                 # Check if we should retry
                 if self.request.retries < max_retries:
                     logger.warning(
-                        f"Task {self.name} failed, retrying ({self.request.retries + 1}/{max_retries}): {exc}",
-                        extra={
-                            "task_id": self.request.id,
-                            "task_name": self.name,
-                            "retry_count": self.request.retries,
-                        }
+                        "task_retry",
+                        task_id=self.request.id,
+                        task_name=self.name,
+                        retry_count=self.request.retries + 1,
+                        max_retries=max_retries,
+                        exception=str(exc)
                     )
                     raise self.retry(exc=exc, countdown=retry_delay, max_retries=max_retries)
                 else:
                     # Final failure - will be caught by @signals.task_failure handler
                     logger.error(
-                        f"Task {self.name} failed after all retries: {exc}",
-                        extra={
-                            "task_id": self.request.id,
-                            "task_name": self.name,
-                            "retry_count": self.request.retries,
-                        }
+                        "task_final_failure",
+                        task_id=self.request.id,
+                        task_name=self.name,
+                        retry_count=self.request.retries,
+                        exception=str(exc)
                     )
                     raise
 
@@ -88,14 +88,13 @@ class BaseTaskWithDLQ(Task):
     def on_retry(self, exc, task_id, args, kwargs, einfo):
         """Called when task is retried."""
         logger.warning(
-            f"Task {self.name} retrying: {exc}",
-            extra={
-                "task_id": task_id,
-                "task_name": self.name,
-                "retry_count": self.request.retries,
-                "args": args,
-                "kwargs": kwargs,
-            }
+            "base_task_retry",
+            task_id=task_id,
+            task_name=self.name,
+            retry_count=self.request.retries,
+            exception=str(exc),
+            task_args=args,
+            task_kwargs=kwargs
         )
         super().on_retry(exc, task_id, args, kwargs, einfo)
 
@@ -105,13 +104,12 @@ class BaseTaskWithDLQ(Task):
         The signal handler will log to DLQ automatically.
         """
         logger.error(
-            f"Task {self.name} failed completely: {exc}",
-            extra={
-                "task_id": task_id,
-                "task_name": self.name,
-                "retry_count": self.request.retries,
-                "args": args,
-                "kwargs": kwargs,
-            }
+            "base_task_failure",
+            task_id=task_id,
+            task_name=self.name,
+            retry_count=self.request.retries,
+            exception=str(exc),
+            task_args=args,
+            task_kwargs=kwargs
         )
         super().on_failure(exc, task_id, args, kwargs, einfo)

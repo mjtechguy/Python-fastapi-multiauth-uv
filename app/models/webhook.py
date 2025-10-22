@@ -1,13 +1,14 @@
 """Webhook models for event notifications."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, String, Text, Integer
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base_class import Base
+from app.db.session import Base
 
 if TYPE_CHECKING:
     from app.models.organization import Organization
@@ -30,7 +31,7 @@ class Webhook(Base):
 
     # Events to subscribe to (e.g., user.created, file.uploaded, etc.)
     # Stored as JSON array
-    events: Mapped[list[str]] = mapped_column(default=list, nullable=False)
+    events: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
 
     # Status
     is_active: Mapped[bool] = mapped_column(default=True, index=True)
@@ -44,9 +45,9 @@ class Webhook(Base):
     last_failure_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
     updated_at: Mapped[datetime] = mapped_column(
-        default=datetime.utcnow, onupdate=datetime.utcnow
+        default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
     )
 
     # Relationships
@@ -68,7 +69,7 @@ class WebhookDelivery(Base):
 
     # Event details
     event_type: Mapped[str] = mapped_column(String(100), index=True)
-    event_data: Mapped[dict] = mapped_column(default=dict, nullable=False)
+    event_data: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
     # Delivery details
     status: Mapped[str] = mapped_column(
@@ -84,7 +85,7 @@ class WebhookDelivery(Base):
     next_retry_at: Mapped[datetime | None] = mapped_column(nullable=True, index=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
     delivered_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     # Relationships

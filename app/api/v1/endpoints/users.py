@@ -60,10 +60,16 @@ async def list_users(
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
+    is_superuser: bool | None = Query(None, description="Filter by superuser status"),
 ) -> UserListResponse:
-    """List all users (superuser only)."""
+    """List all users (superuser only).
+
+    Optionally filter by superuser status to list only global admins.
+    """
     skip = (page - 1) * page_size
-    users, total = await UserService.list_users(db, skip=skip, limit=page_size)
+    users, total = await UserService.list_users(
+        db, skip=skip, limit=page_size, is_superuser=is_superuser
+    )
 
     return UserListResponse(
         items=users,
@@ -88,6 +94,76 @@ async def get_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+
+    return user
+
+
+@router.post("/{user_id}/superuser", response_model=UserResponse)
+async def grant_superuser(
+    user_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_superuser)],
+) -> User:
+    """Grant superuser (global admin) status to a user.
+
+    Only superusers can grant superuser status to other users.
+    This gives the user full access to all system resources and operations.
+    """
+    user = await UserService.get_by_id(db, user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is already a superuser",
+        )
+
+    user.is_superuser = True
+    await db.commit()
+    await db.refresh(user)
+
+    return user
+
+
+@router.delete("/{user_id}/superuser", response_model=UserResponse)
+async def revoke_superuser(
+    user_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_superuser)],
+) -> User:
+    """Revoke superuser (global admin) status from a user.
+
+    Only superusers can revoke superuser status.
+    Cannot revoke your own superuser status.
+    """
+    user = await UserService.get_by_id(db, user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    if not user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is not a superuser",
+        )
+
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot revoke your own superuser status",
+        )
+
+    user.is_superuser = False
+    await db.commit()
+    await db.refresh(user)
 
     return user
 
