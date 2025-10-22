@@ -14,6 +14,8 @@ from app.core.config import settings
 from app.middleware.security import SecurityHeadersMiddleware
 from app.middleware.rate_limit import limiter
 from app.middleware.request_id import RequestIDMiddleware
+from app.middleware.graceful_shutdown import GracefulShutdownMiddleware
+from app.core.graceful_shutdown import shutdown_handler
 
 
 @asynccontextmanager
@@ -30,11 +32,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     print(f"Starting {settings.APP_NAME} in {settings.APP_ENV} mode")
 
+    # Setup graceful shutdown signal handlers
+    shutdown_handler.setup_signal_handlers()
+    print("Graceful shutdown handlers registered")
+
     # Initialize cache
     from app.services.cache import cache
 
     await cache.connect()
     print("Cache service connected")
+
+    # Register cache cleanup callback
+    shutdown_handler.add_cleanup_callback(cache.disconnect)
 
     # Initialize database (create default roles/permissions)
     from app.db.session import AsyncSessionLocal
@@ -53,7 +62,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
     print(f"Shutting down {settings.APP_NAME}")
-    await cache.disconnect()
+
+    # Wait for active requests to complete
+    await shutdown_handler.wait_for_active_requests()
+
+    # Run cleanup callbacks
+    await shutdown_handler.run_cleanup_callbacks()
 
 
 # Create FastAPI application
@@ -66,6 +80,9 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
+
+# Add graceful shutdown middleware (first, to track all requests)
+app.add_middleware(GracefulShutdownMiddleware)
 
 # Add request ID middleware
 app.add_middleware(RequestIDMiddleware)

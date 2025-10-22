@@ -1,0 +1,222 @@
+"""Quota service for usage tracking and enforcement."""
+
+import uuid
+from datetime import datetime, timedelta
+from typing import Any
+
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.quota import OrganizationQuota, UsageLog
+from app.models.organization import Organization
+
+
+class QuotaService:
+    """Service for managing organization quotas."""
+
+    @staticmethod
+    async def get_or_create_quota(
+        db: AsyncSession, organization_id: uuid.UUID
+    ) -> OrganizationQuota:
+        """Get or create quota for an organization."""
+        result = await db.execute(
+            select(OrganizationQuota).where(
+                OrganizationQuota.organization_id == organization_id
+            )
+        )
+        quota = result.scalar_one_or_none()
+
+        if not quota:
+            quota = OrganizationQuota(organization_id=organization_id)
+            db.add(quota)
+            await db.commit()
+            await db.refresh(quota)
+
+        return quota
+
+    @staticmethod
+    async def check_and_reset_monthly_quotas(
+        db: AsyncSession, quota: OrganizationQuota
+    ) -> OrganizationQuota:
+        """Reset monthly quotas if needed."""
+        now = datetime.utcnow()
+        # Reset if more than 30 days have passed
+        if (now - quota.api_calls_reset_at).days >= 30:
+            quota.current_api_calls_this_month = 0
+            quota.api_calls_reset_at = now
+            await db.commit()
+            await db.refresh(quota)
+        return quota
+
+    @staticmethod
+    async def check_and_reset_daily_quotas(
+        db: AsyncSession, quota: OrganizationQuota
+    ) -> OrganizationQuota:
+        """Reset daily quotas if needed."""
+        now = datetime.utcnow()
+        # Reset if more than 1 day has passed
+        if (now - quota.file_uploads_reset_at).days >= 1:
+            quota.current_file_uploads_today = 0
+            quota.file_uploads_reset_at = now
+            await db.commit()
+            await db.refresh(quota)
+        return quota
+
+    @staticmethod
+    async def increment_api_calls(
+        db: AsyncSession,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
+        metadata: dict[str, Any] | None = None
+    ) -> None:
+        """Increment API call counter."""
+        quota = await QuotaService.get_or_create_quota(db, organization_id)
+        quota = await QuotaService.check_and_reset_monthly_quotas(db, quota)
+
+        quota.current_api_calls_this_month += 1
+
+        # Log usage
+        log = UsageLog(
+            organization_id=organization_id,
+            user_id=user_id,
+            usage_type="api_call",
+            metadata=metadata,
+        )
+        db.add(log)
+        await db.commit()
+
+    @staticmethod
+    async def increment_file_uploads(
+        db: AsyncSession,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
+        file_size: int = 0,
+        metadata: dict[str, Any] | None = None
+    ) -> None:
+        """Increment file upload counter and storage usage."""
+        quota = await QuotaService.get_or_create_quota(db, organization_id)
+        quota = await QuotaService.check_and_reset_daily_quotas(db, quota)
+
+        quota.current_file_uploads_today += 1
+        quota.current_storage_bytes += file_size
+
+        # Log usage
+        log = UsageLog(
+            organization_id=organization_id,
+            user_id=user_id,
+            usage_type="file_upload",
+            metadata={**(metadata or {}), "file_size": file_size},
+        )
+        db.add(log)
+        await db.commit()
+
+    @staticmethod
+    async def decrement_storage(
+        db: AsyncSession,
+        organization_id: uuid.UUID,
+        file_size: int,
+        user_id: uuid.UUID | None = None,
+        metadata: dict[str, Any] | None = None
+    ) -> None:
+        """Decrement storage usage."""
+        quota = await QuotaService.get_or_create_quota(db, organization_id)
+        quota.current_storage_bytes = max(0, quota.current_storage_bytes - file_size)
+
+        # Log usage
+        log = UsageLog(
+            organization_id=organization_id,
+            user_id=user_id,
+            usage_type="storage_remove",
+            metadata={**(metadata or {}), "file_size": file_size},
+        )
+        db.add(log)
+        await db.commit()
+
+    @staticmethod
+    async def increment_users(
+        db: AsyncSession,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
+        metadata: dict[str, Any] | None = None
+    ) -> None:
+        """Increment user counter."""
+        quota = await QuotaService.get_or_create_quota(db, organization_id)
+        quota.current_users += 1
+
+        # Log usage
+        log = UsageLog(
+            organization_id=organization_id,
+            user_id=user_id,
+            usage_type="user_add",
+            metadata=metadata,
+        )
+        db.add(log)
+        await db.commit()
+
+    @staticmethod
+    async def decrement_users(
+        db: AsyncSession,
+        organization_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
+        metadata: dict[str, Any] | None = None
+    ) -> None:
+        """Decrement user counter."""
+        quota = await QuotaService.get_or_create_quota(db, organization_id)
+        quota.current_users = max(0, quota.current_users - 1)
+
+        # Log usage
+        log = UsageLog(
+            organization_id=organization_id,
+            user_id=user_id,
+            usage_type="user_remove",
+            metadata=metadata,
+        )
+        db.add(log)
+        await db.commit()
+
+    @staticmethod
+    async def update_limits(
+        db: AsyncSession,
+        organization_id: uuid.UUID,
+        **limits: Any
+    ) -> OrganizationQuota:
+        """Update quota limits for an organization."""
+        quota = await QuotaService.get_or_create_quota(db, organization_id)
+
+        for key, value in limits.items():
+            if value is not None and hasattr(quota, key):
+                setattr(quota, key, value)
+
+        await db.commit()
+        await db.refresh(quota)
+        return quota
+
+    @staticmethod
+    async def get_usage_logs(
+        db: AsyncSession,
+        organization_id: uuid.UUID,
+        page: int = 1,
+        page_size: int = 50,
+        usage_type: str | None = None,
+        user_id: uuid.UUID | None = None,
+    ) -> tuple[list[UsageLog], int]:
+        """Get paginated usage logs for an organization."""
+        query = select(UsageLog).where(UsageLog.organization_id == organization_id)
+
+        if usage_type:
+            query = query.where(UsageLog.usage_type == usage_type)
+        if user_id:
+            query = query.where(UsageLog.user_id == user_id)
+
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_query)
+        total = total_result.scalar_one()
+
+        # Get paginated results
+        query = query.order_by(UsageLog.created_at.desc())
+        query = query.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(query)
+        logs = list(result.scalars().all())
+
+        return logs, total

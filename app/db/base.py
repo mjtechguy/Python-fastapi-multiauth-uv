@@ -17,6 +17,9 @@ from app.models.invitation import Invitation
 from app.models.feature_flag import FeatureFlag
 from app.models.file import File
 from app.models.token import PasswordResetToken, EmailVerificationToken
+from app.models.quota import OrganizationQuota, UsageLog
+from app.models.webhook import Webhook, WebhookDelivery
+from app.models.dead_letter import DeadLetterTask
 
 __all__ = [
     "Base",
@@ -37,4 +40,9 @@ __all__ = [
     "File",
     "PasswordResetToken",
     "EmailVerificationToken",
+    "OrganizationQuota",
+    "UsageLog",
+    "Webhook",
+    "WebhookDelivery",
+    "DeadLetterTask",
 ]

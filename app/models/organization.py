@@ -13,6 +13,7 @@ from app.db.session import Base
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.team import Team
+    from app.models.quota import OrganizationQuota
 
 
 class Organization(Base):
@@ -59,6 +60,9 @@ class Organization(Base):
     )
     teams: Mapped[list["Team"]] = relationship(
         "Team", back_populates="organization", cascade="all, delete-orphan"
+    )
+    quota: Mapped["OrganizationQuota"] = relationship(
+        "OrganizationQuota", back_populates="organization", uselist=False, cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
