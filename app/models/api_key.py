@@ -26,7 +26,7 @@ class APIKey(Base):
 
     # User relationship
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     # Key details
@@ -35,7 +35,7 @@ class APIKey(Base):
     prefix: Mapped[str] = mapped_column(String(10), nullable=False)  # First chars for identification
 
     # Status
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     # Usage tracking
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

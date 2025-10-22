@@ -27,7 +27,7 @@ class Invitation(Base):
 
     # Organization relationship
     organization_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
     # Inviter
@@ -36,7 +36,7 @@ class Invitation(Base):
     )
 
     # Invitee
-    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
 
     # Invitation token
     token: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
@@ -50,7 +50,7 @@ class Invitation(Base):
 
     # Expiration
     expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+        DateTime(timezone=True), nullable=False, index=True
     )
 
     # Timestamps

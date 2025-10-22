@@ -25,12 +25,12 @@ class AuditLog(Base):
 
     # User who performed the action (nullable for system actions)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
     # Action details
-    action: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g., 'user.login'
-    resource_type: Mapped[str] = mapped_column(String(100), nullable=True)  # e.g., 'user'
+    action: Mapped[str] = mapped_column(String(100), nullable=False, index=True)  # e.g., 'user.login'
+    resource_type: Mapped[str] = mapped_column(String(100), nullable=True, index=True)  # e.g., 'user'
     resource_id: Mapped[str] = mapped_column(String(255), nullable=True)
 
     # Request details
