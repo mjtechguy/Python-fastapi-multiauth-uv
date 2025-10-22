@@ -93,7 +93,17 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
 
 - **Type Safety** - Full type hints with Pydantic 2.9+
 - **Code Quality** - Black formatting, Ruff linting
-- **Testing** - Pytest with async support and fixtures
+- **Comprehensive Testing** - Complete test infrastructure:
+  - E2E test suite with async fixtures
+  - Interactive CLI testing tool (`cli.py`)
+  - Automated test runner (`run_tests.sh`)
+  - Coverage reporting with pytest-cov
+  - Separate test database for safety
+- **CLI Testing Tool** - Interactive command-line interface for manual testing:
+  - All API endpoints accessible via CLI
+  - Automatic token management
+  - Pretty-printed JSON output with syntax highlighting
+  - Perfect for testing before frontend integration
 - **Database Migrations** - Alembic with auto-generation
 - **API Documentation** - Auto-generated OpenAPI/Swagger docs
 - **Structured Logging** - JSON logs for aggregation and analysis
@@ -124,6 +134,12 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
 - Python 3.12+
 - Docker & Docker Compose
 - UV package manager
+
+> **⚡ Quick Tip:** Use automated startup scripts for fastest setup!
+> - Development: `./scripts/start.sh`
+> - Production (with Traefik): `./scripts/start-traefik.sh`
+>
+> See [docs/QUICKSTART.md](docs/QUICKSTART.md) for automated setup guide.
 
 ### Option 1: Docker Compose (Recommended for Development)
 
@@ -283,10 +299,41 @@ See [traefik/README.md](traefik/README.md) for complete setup guide.
 │   │   └── filtering.py            # Query filtering
 │   └── main.py                      # Application entry point
 ├── alembic/                         # Database migrations
+│   ├── versions/                   # Migration files
+│   └── env.py                      # Alembic configuration
+├── tests/                           # Test suite
+│   ├── e2e/                        # End-to-end tests
+│   │   ├── test_auth_flow.py      # Auth & verification tests
+│   │   ├── test_organizations.py  # Org & quota tests
+│   │   ├── test_files_and_storage.py
+│   │   ├── test_sessions_and_webhooks.py
+│   │   ├── test_health_and_monitoring.py
+│   │   ├── conftest.py            # E2E fixtures
+│   │   └── README.md
+│   ├── unit/                       # Unit tests
+│   ├── integration/                # Integration tests
+│   └── conftest.py                 # Test fixtures
 ├── docs/                            # Documentation
+│   ├── QUICKSTART.md               # 5-minute quick start
+│   ├── TESTING.md                  # Testing guide
+│   ├── CLI_REFERENCE.md            # CLI tool reference
+│   ├── DEPLOYMENT_CHECKLIST.md     # Deployment guide
+│   ├── DOCKER_COMPOSE.md           # Docker Compose guide
+│   ├── PRODUCTION_READY.md         # Production checklist
+│   ├── SECURITY.md                 # Security features
 │   ├── ARCHITECTURE.md             # System architecture
 │   ├── API_EXAMPLES.md             # API usage examples
 │   └── TLS_SETUP.md                # TLS configuration
+├── scripts/                         # Helper scripts
+│   ├── start.sh                    # Automated dev startup
+│   ├── start-traefik.sh            # Automated production startup
+│   └── init_db.sh                  # Database initialization
+├── traefik/                         # Traefik reverse proxy config
+│   ├── traefik.yml                 # Main Traefik config
+│   ├── dynamic/                    # Dynamic middleware
+│   │   └── middleware.yml
+│   ├── .env.example                # Traefik environment template
+│   └── README.md                   # Traefik setup guide
 ├── helm/                            # Kubernetes Helm charts
 │   └── saas-backend/
 │       ├── Chart.yaml              # Chart metadata
@@ -301,25 +348,13 @@ See [traefik/README.md](traefik/README.md) for complete setup guide.
 │   ├── hpa.yaml                    # Autoscaling
 │   ├── cert-issuer.yaml            # TLS certs
 │   └── README.md
-├── tests/                           # Test suite
-│   ├── unit/                       # Unit tests
-│   ├── integration/                # Integration tests
-│   └── conftest.py                 # Test fixtures
-├── docs/                            # Documentation
-│   ├── QUICKSTART.md               # 5-minute quick start
-│   ├── TESTING.md                  # Testing guide
-│   ├── CLI_REFERENCE.md            # CLI tool reference
-│   ├── DEPLOYMENT_CHECKLIST.md     # Deployment guide
-│   ├── DOCKER_COMPOSE.md           # Docker Compose guide
-│   ├── PRODUCTION_READY.md         # Production checklist
-│   ├── SECURITY.md                 # Security features
-│   ├── ARCHITECTURE.md             # System architecture
-│   └── API_EXAMPLES.md             # API usage examples
 ├── docker-compose.yml               # Complete dev environment
 ├── docker-compose.traefik.yml      # Traefik production setup
 ├── Dockerfile                       # Container definition
 ├── pyproject.toml                  # Dependencies (UV)
 ├── .env.example                    # Environment template
+├── cli.py                           # CLI testing tool
+├── run_tests.sh                     # Automated test runner
 └── README.md                       # This file
 ```
 
@@ -609,7 +644,69 @@ See [docs/PRODUCTION_READY.md](docs/PRODUCTION_READY.md) for complete production
 
 ## 🧪 Development
 
-### Running Tests
+### E2E Test Suite
+
+Comprehensive end-to-end test suite covering all features:
+
+```bash
+# Run complete E2E test suite
+pytest tests/e2e/ -v
+
+# Or use automated test runner
+./run_tests.sh
+
+# Run with coverage
+pytest tests/e2e/ --cov=app --cov-report=html
+
+# Run specific test file
+pytest tests/e2e/test_auth_flow.py -v
+```
+
+**Test Coverage:**
+- ✅ Authentication (register, login, email verification, password reset)
+- ✅ Organizations (CRUD, quota management)
+- ✅ File uploads and storage
+- ✅ Sessions and webhooks
+- ✅ Health checks and monitoring
+- ✅ Dead letter queue management
+
+See [docs/TESTING.md](docs/TESTING.md) for complete guide.
+
+### CLI Testing Tool
+
+Interactive command-line tool for manual API testing:
+
+```bash
+# Install CLI dependencies
+uv pip install -e ".[cli]"
+
+# Register a new user
+python cli.py auth register
+
+# Login
+python cli.py auth login
+
+# Test authenticated endpoints
+python cli.py auth me
+python cli.py health check-all
+python cli.py org create
+python cli.py webhooks events
+python cli.py quota status
+python cli.py files list
+
+# View all commands
+python cli.py --help
+```
+
+**Features:**
+- 🎨 Pretty-printed JSON with syntax highlighting
+- 🔐 Automatic token management
+- 📝 All API endpoints accessible
+- 🚀 Perfect for testing before frontend integration
+
+See [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) for complete command reference.
+
+### Running Unit/Integration Tests
 
 ```bash
 # Run all tests
