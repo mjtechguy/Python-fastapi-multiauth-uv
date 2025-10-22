@@ -285,9 +285,9 @@ print_next_steps() {
     echo ""
     echo -e "${GREEN}Documentation:${NC}"
     echo "   - Traefik Setup: traefik/README.md"
-    echo "   - API Testing: TESTING.md"
-    echo "   - CLI Tool: CLI_REFERENCE.md"
-    echo "   - Deployment: DEPLOYMENT_CHECKLIST.md"
+    echo "   - API Testing: docs/TESTING.md"
+    echo "   - CLI Tool: docs/CLI_REFERENCE.md"
+    echo "   - Deployment: docs/DEPLOYMENT_CHECKLIST.md"
     echo ""
 }
 

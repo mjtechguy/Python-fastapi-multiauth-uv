@@ -52,7 +52,7 @@ For production deployments with automatic SSL certificates and domain routing:
    - API Docs: https://api.yourdomain.com/docs
    - Traefik Dashboard: https://traefik.yourdomain.com
 
-See [traefik/README.md](traefik/README.md) for complete guide.
+See [traefik/README.md](../traefik/README.md) for complete guide.
 
 ---
 
@@ -363,7 +363,7 @@ docker-compose down -v
 - **[TESTING.md](TESTING.md)** - Complete testing guide
 - **[CLI_REFERENCE.md](CLI_REFERENCE.md)** - CLI command reference
 - **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)** - Production deployment
-- **[README.md](README.md)** - Full documentation
+- **[README.md](../README.md)** - Full documentation
 
 ### 2. Try Example Workflows
 

@@ -85,4 +85,4 @@ async def test_my_feature(authenticated_client: AsyncClient):
 
 ## More Information
 
-See [TESTING.md](../../TESTING.md) for complete documentation.
+See [docs/TESTING.md](../../docs/TESTING.md) for complete documentation.

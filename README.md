@@ -154,7 +154,7 @@ docker-compose exec api alembic upgrade head
 
 **That's it!** You now have a complete development environment running.
 
-See [DOCKER_COMPOSE.md](DOCKER_COMPOSE.md) for detailed documentation.
+See [docs/DOCKER_COMPOSE.md](docs/DOCKER_COMPOSE.md) for detailed documentation.
 
 ### Option 2: Local Development
 
@@ -305,12 +305,21 @@ See [traefik/README.md](traefik/README.md) for complete setup guide.
 │   ├── unit/                       # Unit tests
 │   ├── integration/                # Integration tests
 │   └── conftest.py                 # Test fixtures
+├── docs/                            # Documentation
+│   ├── QUICKSTART.md               # 5-minute quick start
+│   ├── TESTING.md                  # Testing guide
+│   ├── CLI_REFERENCE.md            # CLI tool reference
+│   ├── DEPLOYMENT_CHECKLIST.md     # Deployment guide
+│   ├── DOCKER_COMPOSE.md           # Docker Compose guide
+│   ├── PRODUCTION_READY.md         # Production checklist
+│   ├── SECURITY.md                 # Security features
+│   ├── ARCHITECTURE.md             # System architecture
+│   └── API_EXAMPLES.md             # API usage examples
 ├── docker-compose.yml               # Complete dev environment
+├── docker-compose.traefik.yml      # Traefik production setup
 ├── Dockerfile                       # Container definition
 ├── pyproject.toml                  # Dependencies (UV)
 ├── .env.example                    # Environment template
-├── DOCKER_COMPOSE.md               # Docker Compose guide
-├── PRODUCTION_READY.md             # Production checklist
 └── README.md                       # This file
 ```
 
@@ -515,7 +524,7 @@ docker-compose up -d
 - Celery Beat
 - Flower
 
-See [DOCKER_COMPOSE.md](DOCKER_COMPOSE.md) for detailed guide.
+See [docs/DOCKER_COMPOSE.md](docs/DOCKER_COMPOSE.md) for detailed guide.
 
 ### Production (Kubernetes)
 
@@ -596,7 +605,7 @@ Before deploying to production:
 - [ ] Load test the application
 - [ ] Set up CI/CD pipeline
 
-See [PRODUCTION_READY.md](PRODUCTION_READY.md) for complete production guide.
+See [docs/PRODUCTION_READY.md](docs/PRODUCTION_READY.md) for complete production guide.
 
 ## 🧪 Development
 
@@ -759,13 +768,24 @@ asyncio.run(test_websocket())
 
 ## 📚 Documentation
 
+### Getting Started
+- [Quick Start Guide](docs/QUICKSTART.md) - Get running in 5 minutes
+- [Docker Compose Guide](docs/DOCKER_COMPOSE.md) - Local development setup
+- [Testing Guide](docs/TESTING.md) - E2E tests and CLI tool
+- [CLI Reference](docs/CLI_REFERENCE.md) - Command-line testing tool
+
+### Architecture & Design
 - [Architecture Overview](docs/ARCHITECTURE.md) - System design and patterns
 - [API Examples](docs/API_EXAMPLES.md) - Practical usage examples
+- [Security Features](docs/SECURITY.md) - Authentication and security
+
+### Deployment
+- [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md) - Complete deployment guide
+- [Production Ready Guide](docs/PRODUCTION_READY.md) - Production checklist
 - [TLS Setup Guide](docs/TLS_SETUP.md) - Certificate configuration
-- [Docker Compose Guide](DOCKER_COMPOSE.md) - Local development setup
+- [Traefik Integration](traefik/README.md) - SSL/TLS with Traefik
 - [Kubernetes Guide](k8s/README.md) - K8s deployment
 - [Helm Chart Guide](helm/saas-backend/README.md) - Helm deployment
-- [Production Ready Guide](PRODUCTION_READY.md) - Production checklist
 
 ## 🤝 Contributing
 
