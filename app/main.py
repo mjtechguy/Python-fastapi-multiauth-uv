@@ -12,6 +12,7 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.middleware.security import SecurityHeadersMiddleware
 from app.middleware.rate_limit import limiter
+from app.middleware.request_id import RequestIDMiddleware
 
 
 @asynccontextmanager
@@ -27,6 +28,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     # Startup
     print(f"Starting {settings.APP_NAME} in {settings.APP_ENV} mode")
+
+    # Initialize cache
+    from app.services.cache import cache
+
+    await cache.connect()
+    print("Cache service connected")
 
     # Initialize database (create default roles/permissions)
     from app.db.session import AsyncSessionLocal
@@ -45,6 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
     print(f"Shutting down {settings.APP_NAME}")
+    await cache.disconnect()
 
 
 # Create FastAPI application
@@ -57,6 +65,9 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan,
 )
+
+# Add request ID middleware
+app.add_middleware(RequestIDMiddleware)
 
 # Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
