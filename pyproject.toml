@@ -39,6 +39,9 @@ dependencies = [
     "boto3>=1.35.0",
     "pillow>=10.4.0",
 
+    # Payments
+    "stripe>=13.0.0",
+
     # Utilities
     "python-dotenv>=1.0.1",
     "orjson>=3.10.10",

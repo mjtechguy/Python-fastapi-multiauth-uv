@@ -19,6 +19,11 @@ from app.models.feature_flag import FeatureFlag
 from app.models.webhook import Webhook, WebhookDelivery
 from app.models.quota import OrganizationQuota, UsageLog
 from app.models.dead_letter import DeadLetterTask
+from app.models.subscription_plan import SubscriptionPlan
+from app.models.subscription import Subscription
+from app.models.payment_method import PaymentMethod
+from app.models.invoice import Invoice
+from app.models.billing_event import BillingEvent
 
 __all__ = [
     "User",
@@ -46,4 +51,9 @@ __all__ = [
     "OrganizationQuota",
     "UsageLog",
     "DeadLetterTask",
+    "SubscriptionPlan",
+    "Subscription",
+    "PaymentMethod",
+    "Invoice",
+    "BillingEvent",
 ]

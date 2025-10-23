@@ -588,6 +588,196 @@ Shows all configured webhooks with:
 
 ---
 
+## Billing & Subscription Commands
+
+### List Subscription Plans
+
+```bash
+python cli.py billing plans
+```
+
+Shows all available subscription tiers:
+- **Free:** 3 users, 1GB storage, 1K API calls/month
+- **Starter:** 10 users, 10GB storage, 10K API calls/month - $29/mo
+- **Pro:** 50 users, 100GB storage, 100K API calls/month - $99/mo
+- **Enterprise:** Unlimited - $499/mo
+
+### Get Current Subscription
+
+```bash
+python cli.py billing subscription
+```
+
+Shows:
+- Current plan (Free, Starter, Pro, Enterprise)
+- Subscription status (active, trialing, past_due, canceled)
+- Billing period (start/end dates)
+- Trial information (if applicable)
+- Days until renewal
+- Cancellation status
+
+### Get Billing Usage
+
+```bash
+python cli.py billing usage
+```
+
+Shows current billing period usage:
+- **Users:** 5/10 (50%)
+- **Storage:** 2.5GB/10GB (25%)
+- **API Calls:** 8,500/10,000 this month (85%)
+- **File Uploads:** 45/100 today (45%)
+- **Days remaining:** 15 days until renewal
+
+### Upgrade/Downgrade Plan
+
+```bash
+python cli.py billing upgrade
+```
+
+**Interactive prompts:**
+- Choose new plan
+- Billing cycle (monthly/yearly)
+- Confirm proration
+
+**With options:**
+```bash
+# Upgrade to Pro (monthly)
+python cli.py billing upgrade \
+  --plan pro \
+  --cycle monthly \
+  --prorate
+
+# Upgrade to Starter (yearly, save ~17%)
+python cli.py billing upgrade \
+  --plan starter \
+  --cycle yearly
+```
+
+**Note:** Requires organization owner permissions.
+
+### Create Checkout Session
+
+```bash
+python cli.py billing checkout
+```
+
+**Interactive prompts:**
+- Select plan
+- Billing cycle
+- Success/cancel URLs
+
+**With options:**
+```bash
+python cli.py billing checkout \
+  --plan pro \
+  --cycle monthly \
+  --success-url "https://app.example.com/success" \
+  --cancel-url "https://app.example.com/cancel"
+```
+
+Returns a Stripe Checkout URL to complete payment.
+
+### Cancel Subscription
+
+```bash
+python cli.py billing cancel
+```
+
+**Interactive prompts:**
+- Cancel immediately or at period end?
+- Cancellation reason (optional)
+
+**With options:**
+```bash
+# Cancel at end of billing period (recommended)
+python cli.py billing cancel \
+  --reason "No longer needed"
+
+# Cancel immediately
+python cli.py billing cancel \
+  --immediate \
+  --reason "Testing cancellation"
+```
+
+**Note:** Immediate cancellation downgrades to Free plan instantly. Period-end cancellation maintains access until renewal date.
+
+### Resume Subscription
+
+```bash
+python cli.py billing resume
+```
+
+Resumes a subscription that's scheduled for cancellation. Only works if:
+- Subscription is still active (before period end)
+- `cancel_at_period_end` is set to `true`
+
+### List Payment Methods
+
+```bash
+python cli.py billing payment-methods
+```
+
+Shows all saved payment methods:
+- Card brand (Visa, Mastercard, Amex)
+- Last 4 digits
+- Expiration date
+- Default payment method indicator
+
+### List Invoices
+
+```bash
+python cli.py billing invoices
+```
+
+**With pagination:**
+```bash
+python cli.py billing invoices --page 2 --size 20
+```
+
+Shows billing history:
+- Invoice number
+- Amount
+- Status (paid, open, void)
+- Date
+- PDF download link
+
+### Get Invoice Details
+
+```bash
+python cli.py billing invoice <invoice-id>
+```
+
+Shows detailed invoice information:
+- Line items
+- Subtotal, tax, total
+- Payment status
+- Due date
+- Paid date
+- PDF and hosted invoice URLs
+
+### Open Customer Portal
+
+```bash
+python cli.py billing portal
+```
+
+**With return URL:**
+```bash
+python cli.py billing portal \
+  --return-url "https://app.example.com/settings"
+```
+
+Creates a Stripe Customer Portal session for self-service:
+- Update payment methods
+- View billing history
+- Download invoices
+- Cancel subscription
+
+Returns a portal URL that expires in 1 hour.
+
+---
+
 ## Quota Commands
 
 ### Get Quota Status
@@ -886,7 +1076,53 @@ python cli.py webhooks create \
 python cli.py webhooks list
 ```
 
-### 6. System Monitoring
+### 6. Billing & Subscription Management
+
+```bash
+# View available plans
+python cli.py billing plans
+
+# Check current subscription
+python cli.py billing subscription
+
+# Check current usage
+python cli.py billing usage
+
+# Upgrade to Pro plan
+python cli.py billing checkout \
+  --plan pro \
+  --cycle monthly \
+  --success-url "https://app.example.com/success" \
+  --cancel-url "https://app.example.com/cancel"
+
+# Visit the checkout URL returned, complete payment with test card:
+# Card: 4242 4242 4242 4242
+# Exp: Any future date
+# CVC: Any 3 digits
+
+# After payment, verify subscription updated
+python cli.py billing subscription
+
+# Check updated quotas
+python cli.py billing usage
+
+# View invoices
+python cli.py billing invoices
+
+# List payment methods
+python cli.py billing payment-methods
+
+# Open customer portal (for self-service)
+python cli.py billing portal --return-url "https://app.example.com/settings"
+
+# Cancel subscription (at period end)
+python cli.py billing cancel --reason "Testing cancellation flow"
+
+# Resume if needed
+python cli.py billing resume
+```
+
+### 7. System Monitoring
 
 ```bash
 # Check all services

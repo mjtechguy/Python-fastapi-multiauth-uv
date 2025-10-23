@@ -46,6 +46,22 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
   - Usage analytics and reporting
   - Prevent abuse with configurable limits
 
+### 💳 Billing & Subscriptions
+
+- **Stripe Integration** - Complete payment processing and subscription management
+  - **4 Subscription Tiers**: Free, Starter ($29/mo), Pro ($99/mo), Enterprise ($499/mo)
+  - **Stripe Checkout** - Secure, PCI-compliant hosted payment pages
+  - **Customer Portal** - Self-service billing management (update cards, view invoices, cancel)
+  - **Payment Methods** - Store and manage multiple payment methods
+  - **Invoices** - Complete invoice history with PDF downloads
+  - **Webhooks** - Automatic subscription updates from Stripe (10 event types)
+  - **Prorated Billing** - Fair charges when upgrading/downgrading plans
+  - **Trial Periods** - 14-day free trials on paid plans
+  - **Quota Enforcement** - Automatic quota updates based on subscription tier
+  - **Background Tasks** - Async processing for subscription sync, trial reminders, payment failures
+  - **Audit Logging** - Complete billing event tracking for compliance
+  - See [Stripe Integration Guide](STRIPE_INTEGRATION_COMPLETE.md) for setup and usage
+
 ### 📁 File Storage & Management
 
 - **Flexible Storage** - S3-compatible storage (AWS S3, MinIO, DigitalOcean Spaces)
@@ -133,6 +149,7 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
 
 ### 🔌 Integrations & Monitoring
 
+- **Stripe Payments** - Full payment processing integration with webhooks
 - **Prometheus Metrics** - Production-grade observability with `/metrics` endpoint
 - **Enhanced Health Checks** - Comprehensive service monitoring:
   - Database connectivity and query performance
@@ -894,6 +911,11 @@ asyncio.run(test_websocket())
 - `Notification` - In-app notification system
 - `Invitation` - Organization invitation system
 - `FeatureFlag` - Gradual rollout and A/B testing
+- `SubscriptionPlan` - Billing tier definitions with quotas
+- `Subscription` - Organization subscription tracking
+- `PaymentMethod` - Payment method storage (PCI compliant)
+- `Invoice` - Billing invoice records
+- `BillingEvent` - Audit logging for billing events
 
 ### Service Layer
 
@@ -903,12 +925,14 @@ asyncio.run(test_websocket())
 - `FileStorageService` - File upload/download with S3/local providers
 - `CacheService` - Redis caching with decorator pattern
 - `RBACService` - Role and permission management
-- `QuotaService` - Usage quota management and enforcement
+- `QuotaService` - Usage quota management and enforcement (with subscription integration)
 - `WebhookService` - Webhook delivery with HMAC signatures
 - `DeadLetterService` - Failed task management
 - `WebSocketManager` - Real-time connection management
 - `FeatureFlagService` - Feature flag evaluation
 - `LLMService` - OpenAI/LLM integration
+- `StripeService` - Stripe API wrapper for payment operations
+- `BillingService` - Subscription and billing business logic
 
 ### Background Tasks (Celery)
 
@@ -918,6 +942,10 @@ asyncio.run(test_websocket())
 - Session cleanup
 - File processing
 - Failed task DLQ management
+- Subscription sync from Stripe
+- Quota updates from subscription plans
+- Trial expiration checks
+- Payment failure monitoring
 - Custom async operations
 
 ### Deployment Targets
@@ -938,6 +966,12 @@ asyncio.run(test_websocket())
 - [Architecture Overview](docs/ARCHITECTURE.md) - System design and patterns
 - [API Examples](docs/API_EXAMPLES.md) - Practical usage examples
 - [Security Features](docs/SECURITY.md) - Authentication and security
+
+### Billing & Subscriptions
+- [Stripe Integration Complete Guide](STRIPE_INTEGRATION_COMPLETE.md) - Quick start and production deployment
+- [Stripe Setup Guide](docs/STRIPE_SETUP.md) - Complete Stripe configuration
+- [Stripe Implementation Plan](docs/STRIPE_PLAN.md) - Technical specification
+- [Stripe Implementation Summary](docs/STRIPE_IMPLEMENTATION_SUMMARY.md) - Technical overview
 
 ### Deployment
 - [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md) - Complete deployment guide
@@ -993,6 +1027,7 @@ Built with:
 - [SQLAlchemy](https://www.sqlalchemy.org/)
 - [Pydantic](https://docs.pydantic.dev/)
 - [Celery](https://docs.celeryq.dev/)
+- [Stripe](https://stripe.com/) for payment processing
 - And many other amazing open-source projects
 
 ---

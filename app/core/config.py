@@ -125,6 +125,26 @@ class Settings(BaseSettings):
     ALLOWED_FILE_TYPES: str = ""  # Comma-separated MIME types, or "*" for all types
     BLOCKED_FILE_TYPES: str = "application/x-executable,application/x-dosexec,application/x-msdos-program"  # Security: block executables
 
+    # Stripe / Billing
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_API_VERSION: str = "2025-09-30"
+
+    # Stripe Price IDs (created in Stripe Dashboard)
+    STRIPE_PRICE_STARTER_MONTHLY: str = ""
+    STRIPE_PRICE_STARTER_YEARLY: str = ""
+    STRIPE_PRICE_PRO_MONTHLY: str = ""
+    STRIPE_PRICE_PRO_YEARLY: str = ""
+    STRIPE_PRICE_ENTERPRISE_MONTHLY: str = ""
+    STRIPE_PRICE_ENTERPRISE_YEARLY: str = ""
+
+    # Billing Configuration
+    BILLING_TRIAL_DAYS: int = 14
+    BILLING_GRACE_PERIOD_DAYS: int = 3
+    BILLING_SEND_RECEIPTS: bool = True
+    BILLING_ALLOW_DOWNGRADES: bool = True
+
     @property
     def is_production(self) -> bool:
         """Check if running in production environment."""

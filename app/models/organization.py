@@ -14,6 +14,10 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.team import Team
     from app.models.quota import OrganizationQuota
+    from app.models.subscription import Subscription
+    from app.models.payment_method import PaymentMethod
+    from app.models.invoice import Invoice
+    from app.models.billing_event import BillingEvent
 
 
 class Organization(Base):
@@ -63,6 +67,18 @@ class Organization(Base):
     )
     quota: Mapped["OrganizationQuota"] = relationship(
         "OrganizationQuota", back_populates="organization", uselist=False, cascade="all, delete-orphan"
+    )
+    subscription: Mapped["Subscription | None"] = relationship(
+        "Subscription", back_populates="organization", uselist=False, cascade="all, delete-orphan"
+    )
+    payment_methods: Mapped[list["PaymentMethod"]] = relationship(
+        "PaymentMethod", back_populates="organization", cascade="all, delete-orphan"
+    )
+    invoices: Mapped[list["Invoice"]] = relationship(
+        "Invoice", back_populates="organization", cascade="all, delete-orphan"
+    )
+    billing_events: Mapped[list["BillingEvent"]] = relationship(
+        "BillingEvent", back_populates="organization", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

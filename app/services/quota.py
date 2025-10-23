@@ -9,10 +9,124 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.quota import OrganizationQuota, UsageLog
 from app.models.organization import Organization
+from app.models.subscription import Subscription
 
 
 class QuotaService:
     """Service for managing organization quotas."""
+
+    @staticmethod
+    async def check_subscription_active(
+        db: AsyncSession, organization_id: uuid.UUID
+    ) -> tuple[bool, str | None]:
+        """
+        Check if organization has an active subscription.
+
+        Returns:
+            (is_active, error_message)
+        """
+        result = await db.execute(
+            select(Subscription).where(Subscription.organization_id == organization_id)
+        )
+        subscription = result.scalar_one_or_none()
+
+        if not subscription:
+            return False, "No subscription found"
+
+        if subscription.status == "canceled":
+            return False, "Subscription has been canceled. Please reactivate to continue."
+
+        if subscription.status == "past_due":
+            return (
+                False,
+                "Payment failed. Please update your payment method to continue using the service.",
+            )
+
+        if subscription.status in ["unpaid", "incomplete", "incomplete_expired"]:
+            return False, "Subscription payment incomplete. Please complete payment setup."
+
+        # Active or trialing is OK
+        return True, None
+
+    @staticmethod
+    async def check_quota_with_subscription(
+        db: AsyncSession,
+        organization_id: uuid.UUID,
+        quota_type: str,
+        amount: int = 1,
+    ) -> tuple[bool, str | None]:
+        """
+        Check quota with subscription validation.
+
+        Args:
+            db: Database session
+            organization_id: Organization UUID
+            quota_type: Type of quota to check (users, storage, api_calls, file_uploads)
+            amount: Amount to check (e.g., file size in bytes for storage)
+
+        Returns:
+            (allowed: bool, error_message: str | None)
+        """
+        # First check subscription status
+        is_active, error = await QuotaService.check_subscription_active(db, organization_id)
+        if not is_active:
+            return False, error
+
+        # Get quota
+        quota = await QuotaService.get_or_create_quota(db, organization_id)
+
+        # Reset quotas if needed
+        if quota_type in ["api_calls", "storage"]:
+            quota = await QuotaService.check_and_reset_monthly_quotas(db, quota)
+        elif quota_type == "file_uploads":
+            quota = await QuotaService.check_and_reset_daily_quotas(db, quota)
+
+        # Check specific quota type
+        if quota_type == "users":
+            if quota.max_users != -1 and quota.current_users >= quota.max_users:
+                return (
+                    False,
+                    f"User limit reached ({quota.max_users}). Please upgrade your plan to add more users.",
+                )
+
+        elif quota_type == "storage":
+            if quota.max_storage_bytes != -1 and (
+                quota.current_storage_bytes + amount
+            ) > quota.max_storage_bytes:
+                return (
+                    False,
+                    f"Storage limit reached. Please upgrade your plan for more storage.",
+                )
+
+        elif quota_type == "api_calls":
+            if (
+                quota.max_api_calls_per_month != -1
+                and quota.current_api_calls_this_month >= quota.max_api_calls_per_month
+            ):
+                return (
+                    False,
+                    f"API call limit reached ({quota.max_api_calls_per_month}/month). Please upgrade your plan.",
+                )
+
+        elif quota_type == "file_uploads":
+            if (
+                quota.max_file_uploads_per_day != -1
+                and quota.current_file_uploads_today >= quota.max_file_uploads_per_day
+            ):
+                return (
+                    False,
+                    f"Daily file upload limit reached ({quota.max_file_uploads_per_day}). Please upgrade your plan.",
+                )
+
+            # Also check file size limit
+            if quota.max_file_size_bytes != -1 and amount > quota.max_file_size_bytes:
+                max_size_mb = quota.max_file_size_bytes / (1024 * 1024)
+                return (
+                    False,
+                    f"File size exceeds limit ({max_size_mb:.1f}MB). Please upgrade your plan for larger files.",
+                )
+
+        return True, None
 
     @staticmethod
     async def get_or_create_quota(
