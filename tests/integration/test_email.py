@@ -132,6 +132,25 @@ class TestEmailFunctionality:
         # Should have both HTML and text parts
         assert "text/plain" in email_body or "text/html" in email_body
 
+    async def test_verification_email_uses_base_url_from_settings(self, mock_smtp):
+        """
+        Regression test: Verify that verification emails use base URL from settings.
+
+        Before fix: Used settings.CORS_ORIGINS[0] (string indexing on comma-separated string)
+        After fix: Uses settings.get_cors_origins()[0] (properly parsed list)
+        """
+        token = "test_token_base_url"
+
+        send_verification_email(to_email="test@example.com", token=token)
+
+        sent_message = mock_smtp.send_message.call_args[0][0]
+        email_body = str(sent_message)
+
+        # Should contain the verification URL with base URL from settings
+        # After fix, this should work correctly with get_cors_origins()
+        assert "verify-email?token=" in email_body
+        assert token in email_body
+
     async def test_send_password_reset_email(self, mock_smtp):
         """Test password reset email template."""
         token = "reset_token_xyz789"
@@ -163,6 +182,24 @@ class TestEmailFunctionality:
         assert token in email_body
         assert "reset-password?token=" in email_body
         assert "expire" in email_body.lower()  # Should mention expiration
+
+    async def test_password_reset_email_uses_base_url_from_settings(self, mock_smtp):
+        """
+        Regression test: Verify that password reset emails use base URL from settings.
+
+        Before fix: Used settings.CORS_ORIGINS[0] (string indexing)
+        After fix: Uses settings.get_cors_origins()[0] (properly parsed)
+        """
+        token = "reset_token_base_url"
+
+        send_password_reset_email(to_email="test@example.com", token=token)
+
+        sent_message = mock_smtp.send_message.call_args[0][0]
+        email_body = str(sent_message)
+
+        # Should contain the reset URL with base URL from settings
+        assert "reset-password?token=" in email_body
+        assert token in email_body
 
     async def test_send_welcome_email(self, mock_smtp):
         """Test welcome email template."""

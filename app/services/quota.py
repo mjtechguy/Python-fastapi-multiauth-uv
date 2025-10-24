@@ -142,7 +142,7 @@ class QuotaService:
         if not quota:
             quota = OrganizationQuota(organization_id=organization_id)
             db.add(quota)
-            await db.commit()
+            await db.flush()
             await db.refresh(quota)
 
         return quota
@@ -157,7 +157,7 @@ class QuotaService:
         if (now - quota.api_calls_reset_at).days >= 30:
             quota.current_api_calls_this_month = 0
             quota.api_calls_reset_at = now
-            await db.commit()
+            await db.flush()
             await db.refresh(quota)
         return quota
 
@@ -171,7 +171,7 @@ class QuotaService:
         if (now - quota.file_uploads_reset_at).days >= 1:
             quota.current_file_uploads_today = 0
             quota.file_uploads_reset_at = now
-            await db.commit()
+            await db.flush()
             await db.refresh(quota)
         return quota
 
@@ -182,7 +182,12 @@ class QuotaService:
         user_id: uuid.UUID | None = None,
         metadata: dict[str, Any] | None = None
     ) -> None:
-        """Increment API call counter."""
+        """
+        Increment API call counter.
+
+        Note: This method uses flush() instead of commit().
+        The caller is responsible for committing the transaction.
+        """
         quota = await QuotaService.get_or_create_quota(db, organization_id)
         quota = await QuotaService.check_and_reset_monthly_quotas(db, quota)
 
@@ -196,7 +201,7 @@ class QuotaService:
             extra_data=metadata,
         )
         db.add(log)
-        await db.commit()
+        await db.flush()
 
     @staticmethod
     async def increment_file_uploads(
@@ -206,7 +211,12 @@ class QuotaService:
         file_size: int = 0,
         metadata: dict[str, Any] | None = None
     ) -> None:
-        """Increment file upload counter and storage usage."""
+        """
+        Increment file upload counter and storage usage.
+
+        Note: This method uses flush() instead of commit().
+        The caller is responsible for committing the transaction.
+        """
         quota = await QuotaService.get_or_create_quota(db, organization_id)
         quota = await QuotaService.check_and_reset_daily_quotas(db, quota)
 
@@ -221,7 +231,7 @@ class QuotaService:
             extra_data={**(metadata or {}), "file_size": file_size},
         )
         db.add(log)
-        await db.commit()
+        await db.flush()
 
     @staticmethod
     async def decrement_storage(
@@ -231,7 +241,12 @@ class QuotaService:
         user_id: uuid.UUID | None = None,
         metadata: dict[str, Any] | None = None
     ) -> None:
-        """Decrement storage usage."""
+        """
+        Decrement storage usage.
+
+        Note: This method uses flush() instead of commit().
+        The caller is responsible for committing the transaction.
+        """
         quota = await QuotaService.get_or_create_quota(db, organization_id)
         quota.current_storage_bytes = max(0, quota.current_storage_bytes - file_size)
 
@@ -243,7 +258,7 @@ class QuotaService:
             extra_data={**(metadata or {}), "file_size": file_size},
         )
         db.add(log)
-        await db.commit()
+        await db.flush()
 
     @staticmethod
     async def increment_users(
@@ -252,7 +267,12 @@ class QuotaService:
         user_id: uuid.UUID | None = None,
         metadata: dict[str, Any] | None = None
     ) -> None:
-        """Increment user counter."""
+        """
+        Increment user counter.
+
+        Note: This method uses flush() instead of commit().
+        The caller is responsible for committing the transaction.
+        """
         quota = await QuotaService.get_or_create_quota(db, organization_id)
         quota.current_users += 1
 
@@ -264,7 +284,7 @@ class QuotaService:
             extra_data=metadata,
         )
         db.add(log)
-        await db.commit()
+        await db.flush()
 
     @staticmethod
     async def decrement_users(
@@ -273,7 +293,12 @@ class QuotaService:
         user_id: uuid.UUID | None = None,
         metadata: dict[str, Any] | None = None
     ) -> None:
-        """Decrement user counter."""
+        """
+        Decrement user counter.
+
+        Note: This method uses flush() instead of commit().
+        The caller is responsible for committing the transaction.
+        """
         quota = await QuotaService.get_or_create_quota(db, organization_id)
         quota.current_users = max(0, quota.current_users - 1)
 
@@ -285,7 +310,7 @@ class QuotaService:
             extra_data=metadata,
         )
         db.add(log)
-        await db.commit()
+        await db.flush()
 
     @staticmethod
     async def update_limits(
@@ -293,14 +318,19 @@ class QuotaService:
         organization_id: uuid.UUID,
         **limits: Any
     ) -> OrganizationQuota:
-        """Update quota limits for an organization."""
+        """
+        Update quota limits for an organization.
+
+        Note: This method uses flush() instead of commit().
+        The caller is responsible for committing the transaction.
+        """
         quota = await QuotaService.get_or_create_quota(db, organization_id)
 
         for key, value in limits.items():
             if value is not None and hasattr(quota, key):
                 setattr(quota, key, value)
 
-        await db.commit()
+        await db.flush()
         await db.refresh(quota)
         return quota
 

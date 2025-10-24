@@ -1,13 +1,33 @@
 """Caching service for Redis-based caching."""
 
-import json
 from collections.abc import Callable
+from datetime import date, datetime
 from functools import wraps
 from typing import Any
+from uuid import UUID
 
+import orjson
 import redis.asyncio as aioredis
+from pydantic import BaseModel
 
 from app.core.config import settings
+
+
+def orjson_default(obj: Any) -> Any:
+    """
+    Custom default handler for orjson serialization.
+
+    Handles datetime, date, UUID, and Pydantic models.
+    """
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, date):
+        return obj.isoformat()
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, BaseModel):
+        return obj.model_dump()
+    raise TypeError(f"Type {type(obj)} not serializable")
 
 
 class CacheService:
@@ -38,7 +58,9 @@ class CacheService:
 
         value = await self.redis.get(key)  # type: ignore
         if value:
-            return json.loads(value)
+            # orjson.loads requires bytes, but redis returns str with decode_responses=True
+            # So we need to encode it back
+            return orjson.loads(value.encode() if isinstance(value, str) else value)
         return None
 
     async def set(
@@ -48,7 +70,8 @@ class CacheService:
         if not self.redis:
             await self.connect()
 
-        serialized = json.dumps(value)
+        # orjson.dumps returns bytes, decode to str for redis
+        serialized = orjson.dumps(value, default=orjson_default).decode("utf-8")
         if expire:
             await self.redis.setex(key, expire, serialized)  # type: ignore
         else:

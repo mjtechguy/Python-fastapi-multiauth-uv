@@ -27,11 +27,13 @@ class UserService:
 
     @staticmethod
     async def get_by_email(db: AsyncSession, email: str) -> User | None:
-        """Get user by email."""
+        """Get user by email (case-insensitive)."""
+        # Normalize email to lowercase for case-insensitive lookup
+        normalized_email = email.lower().strip()
         result = await db.execute(
             select(User)
             .options(selectinload(User.roles), selectinload(User.organizations))
-            .where(User.email == email)
+            .where(User.email == normalized_email)
         )
         return result.scalar_one_or_none()
 
@@ -46,8 +48,9 @@ class UserService:
     @staticmethod
     async def create(db: AsyncSession, user_in: UserCreate) -> User:
         """Create a new user."""
+        # Normalize email to lowercase to prevent duplicates differing only by case
         user = User(
-            email=user_in.email,
+            email=user_in.email.lower().strip(),
             username=user_in.username,
             full_name=user_in.full_name,
             hashed_password=get_password_hash(user_in.password),

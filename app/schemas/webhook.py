@@ -2,8 +2,12 @@
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from app.models.webhook import Webhook
 
 
 class WebhookCreate(BaseModel):
@@ -33,7 +37,7 @@ class WebhookResponse(BaseModel):
     id: uuid.UUID
     organization_id: uuid.UUID
     url: str
-    secret: str = Field(..., description="Secret for HMAC signature verification")
+    secret: str = Field(..., description="Masked secret (only first 8 chars)")
     description: str | None
     events: list[str]
     is_active: bool
@@ -45,6 +49,43 @@ class WebhookResponse(BaseModel):
     last_failure_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+    @classmethod
+    def from_webhook(cls, webhook: "Webhook") -> "WebhookResponse":
+        """Create response with masked secret."""
+        return cls(
+            id=webhook.id,
+            organization_id=webhook.organization_id,
+            url=webhook.url,
+            secret=f"{webhook.secret[:8]}{'*' * (len(webhook.secret) - 8)}",
+            description=webhook.description,
+            events=webhook.events,
+            is_active=webhook.is_active,
+            total_deliveries=webhook.total_deliveries,
+            successful_deliveries=webhook.successful_deliveries,
+            failed_deliveries=webhook.failed_deliveries,
+            last_delivery_at=webhook.last_delivery_at,
+            last_success_at=webhook.last_success_at,
+            last_failure_at=webhook.last_failure_at,
+            created_at=webhook.created_at,
+            updated_at=webhook.updated_at,
+        )
+
+    class Config:
+        from_attributes = True
+
+
+class WebhookCreatedResponse(BaseModel):
+    """Schema for webhook creation response (includes full secret once)."""
+
+    id: uuid.UUID
+    organization_id: uuid.UUID
+    url: str
+    secret: str = Field(..., description="Full secret for HMAC signature verification (save this!)")
+    description: str | None
+    events: list[str]
+    is_active: bool
+    created_at: datetime
 
     class Config:
         from_attributes = True

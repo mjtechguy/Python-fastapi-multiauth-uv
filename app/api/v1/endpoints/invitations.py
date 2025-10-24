@@ -67,7 +67,7 @@ async def create_invitation(
         accepted_by_id=invitation.accepted_by_id,
         expires_at=invitation.expires_at,
         created_at=invitation.created_at,
-        token=invitation.token,
+        token=getattr(invitation, "plaintext_token", None),  # Plaintext token returned once
     )
 
 
@@ -315,5 +315,5 @@ async def resend_invitation(
         accepted_by_id=invitation.accepted_by_id,
         expires_at=invitation.expires_at,
         created_at=invitation.created_at,
-        token=invitation.token,
+        token=getattr(invitation, "plaintext_token", None),  # Plaintext token returned once
     )

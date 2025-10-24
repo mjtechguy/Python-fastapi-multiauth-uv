@@ -20,15 +20,30 @@ class AuthService:
 
     @staticmethod
     async def authenticate_local(
-        db: AsyncSession, email: str, password: str
-    ) -> tuple[User, Token] | tuple[None, None]:
-        """Authenticate user with email and password."""
+        db: AsyncSession,
+        email: str,
+        password: str,
+        user_agent: str | None = None,
+        ip_address: str | None = None,
+    ) -> tuple[User, Token | str] | tuple[None, None]:
+        """
+        Authenticate user with email and password.
+
+        Returns:
+            - (User, Token) if no MFA required
+            - (User, mfa_token_string) if MFA required (str indicates MFA challenge)
+            - (None, None) if authentication failed
+        """
         user = await UserService.get_by_email(db, email)
 
         if not user:
             return None, None
 
         if not user.is_active:
+            return None, None
+
+        # Check email verification
+        if not user.is_verified:
             return None, None
 
         if await UserService.is_locked(user):
@@ -39,12 +54,120 @@ class AuthService:
             await db.commit()
             return None, None
 
+        # Check if MFA is enabled for this user
+        from app.services.totp import TOTPService
+
+        totp_secret = await TOTPService.get_totp_secret(db, user.id)
+
+        if totp_secret and totp_secret.is_enabled:
+            # Password auth successful, but MFA required
+            # Return MFA challenge token (NOT a full access token)
+            from app.core.security import create_mfa_token
+
+            mfa_token = create_mfa_token(str(user.id))
+            return user, mfa_token
+
+        # No MFA required, proceed with normal login
         await UserService.update_last_login(db, user)
+        await db.flush()
+
+        # Create tokens
+        access_token_str = create_access_token(str(user.id))
+        refresh_token_str = create_refresh_token(str(user.id))
+
+        # Create session with refresh token
+        from app.services.session import SessionService
+
+        await SessionService.create_session(
+            db=db,
+            user=user,
+            refresh_token=refresh_token_str,
+            user_agent=user_agent,
+            ip_address=ip_address,
+        )
+
         await db.commit()
 
         token = Token(
-            access_token=create_access_token(str(user.id)),
-            refresh_token=create_refresh_token(str(user.id)),
+            access_token=access_token_str,
+            refresh_token=refresh_token_str,
+        )
+
+        return user, token
+
+    @staticmethod
+    async def verify_mfa(
+        db: AsyncSession,
+        mfa_token: str,
+        totp_code: str,
+        user_agent: str | None = None,
+        ip_address: str | None = None,
+    ) -> tuple[User, Token] | tuple[None, None]:
+        """
+        Verify MFA and complete authentication.
+
+        Args:
+            db: Database session
+            mfa_token: MFA challenge token from phase 1
+            totp_code: TOTP code from authenticator app
+            user_agent: User agent string from request
+            ip_address: IP address from request
+
+        Returns:
+            - (User, Token) if MFA verification successful
+            - (None, None) if verification failed
+        """
+        # Verify MFA token
+        user_id = verify_token(mfa_token, token_type="mfa")
+
+        if not user_id:
+            return None, None
+
+        from uuid import UUID
+
+        user = await UserService.get_by_id(db, UUID(user_id))
+
+        if not user or not user.is_active or not user.is_verified:
+            return None, None
+
+        if await UserService.is_locked(user):
+            return None, None
+
+        # Verify TOTP code
+        from app.services.totp import TOTPService
+
+        totp_valid = await TOTPService.verify_totp_for_user(db, user, totp_code)
+
+        if not totp_valid:
+            # Increment failed login attempts for invalid TOTP
+            await UserService.increment_failed_login(db, user)
+            await db.commit()
+            return None, None
+
+        # MFA verification successful, update last login and issue tokens
+        await UserService.update_last_login(db, user)
+        await db.flush()
+
+        # Create tokens
+        access_token_str = create_access_token(str(user.id))
+        refresh_token_str = create_refresh_token(str(user.id))
+
+        # Create session with refresh token
+        from app.services.session import SessionService
+
+        await SessionService.create_session(
+            db=db,
+            user=user,
+            refresh_token=refresh_token_str,
+            user_agent=user_agent,
+            ip_address=ip_address,
+        )
+
+        await db.commit()
+
+        token = Token(
+            access_token=access_token_str,
+            refresh_token=refresh_token_str,
         )
 
         return user, token
@@ -61,7 +184,11 @@ class AuthService:
 
         user = await UserService.get_by_id(db, UUID(user_id))
 
-        if not user or not user.is_active:
+        if not user or not user.is_active or not user.is_verified:
+            return None
+
+        # Check if user is locked
+        if await UserService.is_locked(user):
             return None
 
         return Token(
@@ -126,27 +253,71 @@ class AuthService:
                     "https://www.googleapis.com/oauth2/v2/userinfo",
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
-            elif provider == "github":
+                response.raise_for_status()
+                return response.json()
+            if provider == "github":
+                # Get basic user info
                 response = await client.get(
                     "https://api.github.com/user",
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
-            elif provider == "microsoft":
+                response.raise_for_status()
+                user_info = response.json()
+
+                # GitHub can return email=None, so fetch from /user/emails
+                if not user_info.get("email"):
+                    emails_response = await client.get(
+                        "https://api.github.com/user/emails",
+                        headers={"Authorization": f"Bearer {access_token}"},
+                    )
+                    emails_response.raise_for_status()
+                    emails = emails_response.json()
+
+                    # Find primary verified email
+                    primary_email = next(
+                        (e["email"] for e in emails if e.get("primary") and e.get("verified")),
+                        None
+                    )
+                    # Fallback to first verified email
+                    if not primary_email:
+                        primary_email = next(
+                            (e["email"] for e in emails if e.get("verified")),
+                            None
+                        )
+
+                    user_info["email"] = primary_email
+
+                return user_info
+            if provider == "microsoft":
                 response = await client.get(
                     "https://graph.microsoft.com/v1.0/me",
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
-            else:
-                raise ValueError(f"Unsupported OAuth provider: {provider}")
-
-            response.raise_for_status()
-            return response.json()
+                response.raise_for_status()
+                return response.json()
+            raise ValueError(f"Unsupported OAuth provider: {provider}")
 
     @staticmethod
-    async def authenticate_oauth(
-        db: AsyncSession, provider: str, code: str
+    async def authenticate_oauth(  # noqa: PLR0915
+        db: AsyncSession,
+        provider: str,
+        code: str,
+        user_agent: str | None = None,
+        ip_address: str | None = None,
     ) -> tuple[User, Token] | tuple[None, None]:
-        """Authenticate user via OAuth provider."""
+        """
+        Authenticate user via OAuth provider.
+
+        Args:
+            db: Database session
+            provider: OAuth provider name
+            code: Authorization code
+            user_agent: User agent string from request
+            ip_address: IP address from request
+
+        Returns:
+            Tuple of (User, Token) or (None, None) if failed
+        """
         try:
             client = await AuthService.get_oauth_client(provider)
             token_url = AuthService.get_oauth_token_url(provider)
@@ -200,14 +371,19 @@ class AuthService:
                 user = await UserService.get_by_email(db, email)
 
                 if not user:
-                    # Create new user
+                    # Create new user (email already normalized by get_by_email lookup)
                     user = User(
-                        email=email,
+                        email=email.lower().strip(),
                         full_name=name,
                         is_verified=True,  # OAuth emails are pre-verified
                     )
                     db.add(user)
                     await db.flush()
+
+                    # Add user to default organization (same as email/password registration)
+                    from app.services.organization import OrganizationService
+                    default_org = await OrganizationService.get_or_create_default_organization(db)
+                    await OrganizationService.add_member(db, default_org.id, user.id)
 
                 # Create OAuth account
                 oauth_account = OAuthAccount(
@@ -221,12 +397,29 @@ class AuthService:
                 db.add(oauth_account)
 
             await UserService.update_last_login(db, user)
+            await db.flush()
+
+            # Create tokens
+            access_token_str = create_access_token(str(user.id))
+            refresh_token_str = create_refresh_token(str(user.id))
+
+            # Create session with refresh token
+            from app.services.session import SessionService
+
+            await SessionService.create_session(
+                db=db,
+                user=user,
+                refresh_token=refresh_token_str,
+                user_agent=user_agent,
+                ip_address=ip_address,
+            )
+
             await db.commit()
             await db.refresh(user)
 
             auth_token = Token(
-                access_token=create_access_token(str(user.id)),
-                refresh_token=create_refresh_token(str(user.id)),
+                access_token=access_token_str,
+                refresh_token=refresh_token_str,
             )
 
             return user, auth_token
@@ -285,12 +478,17 @@ class AuthService:
 
                 if not user:
                     user = User(
-                        email=email,
+                        email=email.lower().strip(),
                         full_name=name,
                         is_verified=True,
                     )
                     db.add(user)
                     await db.flush()
+
+                    # Add user to default organization (same as email/password registration)
+                    from app.services.organization import OrganizationService
+                    default_org = await OrganizationService.get_or_create_default_organization(db)
+                    await OrganizationService.add_member(db, default_org.id, user.id)
 
                 oauth_account = OAuthAccount(
                     user_id=user.id,

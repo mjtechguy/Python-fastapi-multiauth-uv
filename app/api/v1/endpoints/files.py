@@ -27,6 +27,7 @@ from app.schemas.file import (
     FileResponse,
     FileUploadResponse,
 )
+from app.services.quota import QuotaService
 from app.services.storage import storage_service
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -48,7 +49,7 @@ DEFAULT_ALLOWED_TYPES = DEFAULT_ALLOWED_IMAGE_TYPES + DEFAULT_ALLOWED_DOCUMENT_T
 
 
 @router.post("/upload", response_model=FileUploadResponse, status_code=status.HTTP_201_CREATED)
-async def upload_file(
+async def upload_file(  # noqa: PLR0915
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -64,19 +65,23 @@ async def upload_file(
     - With org: uploads/org_<org_id>/user_<user_id>/filename
     - Without org: uploads/user_<user_id>/filename
     """
-    # Validate file size
-    content = await file.read()
-    file_size = len(content)
-    max_file_size = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+    # Get claimed content type from header
+    claimed_content_type = file.content_type or "application/octet-stream"
 
-    if not storage_service.validate_file_size(file_size, max_file_size):
+    # Verify actual MIME type by reading file header (security check)
+    # This prevents malicious files with fake extensions
+    try:
+        actual_content_type = storage_service.verify_mime_type(
+            file.file, claimed_type=claimed_content_type
+        )
+    except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File size exceeds maximum allowed size of {settings.MAX_FILE_SIZE_MB}MB",
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"MIME type verification failed: {e!s}",
         )
 
-    # Validate file type
-    content_type = file.content_type or "application/octet-stream"
+    # Use actual detected content type for validation
+    content_type = actual_content_type
 
     # Check blocked types first (security)
     blocked_types = settings.blocked_file_types_list
@@ -107,12 +112,27 @@ async def upload_file(
                 detail=f"File type {content_type} not supported",
             )
 
-    # Create file-like object
-    from io import BytesIO
+    # Calculate file size by streaming (avoid loading entire file into memory)
+    file.file.seek(0)
+    file_size = 0
+    chunk_size = 8192
 
-    file_obj = BytesIO(content)
+    while chunk := file.file.read(chunk_size):
+        file_size += len(chunk)
+        # Check size limit while streaming
+        max_file_size = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+        if file_size > max_file_size:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File size exceeds maximum allowed size of {settings.MAX_FILE_SIZE_MB}MB",
+            )
 
-    # Optimize images
+    # Reset file pointer for upload
+    file.file.seek(0)
+
+    # For images, optimize them (this requires loading into memory for PIL)
+    # TODO: Consider streaming image optimization for very large images
+    file_obj = file.file
     if content_type in DEFAULT_ALLOWED_IMAGE_TYPES:
         file_obj = storage_service.optimize_image(file_obj)
         file_size = len(file_obj.getvalue())
@@ -133,6 +153,35 @@ async def upload_file(
         # Use user's default organization
         default_org = await OrganizationService.get_or_create_default(db)
         final_org_id = default_org.id
+
+    # Check quota before upload
+    quota = await QuotaService.get_or_create_quota(db, final_org_id)
+    quota = await QuotaService.check_and_reset_daily_quotas(db, quota)
+
+    # Check file upload quota
+    if quota.is_file_upload_quota_exceeded():
+        raise HTTPException(
+            status_code=429,
+            detail=f"File upload quota exceeded. Limit: {quota.max_file_uploads_per_day} uploads per day. "
+                   f"Resets at: {quota.file_uploads_reset_at.isoformat()}",
+        )
+
+    # Check file size
+    if quota.is_file_size_exceeded(file_size):
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size exceeds limit. Maximum allowed: {quota.max_file_size_bytes} bytes "
+                   f"({quota.max_file_size_bytes / 1024 / 1024:.2f} MB)",
+        )
+
+    # Check storage quota
+    if quota.is_storage_quota_exceeded(file_size):
+        raise HTTPException(
+            status_code=507,
+            detail=f"Storage quota exceeded. Current: {quota.current_storage_bytes} bytes, "
+                   f"Limit: {quota.max_storage_bytes} bytes. "
+                   f"Additional {file_size} bytes would exceed limit.",
+        )
 
     # Upload to storage with org/user path structure
     try:
@@ -164,6 +213,17 @@ async def upload_file(
             file_record.s3_key = storage_path
 
         db.add(file_record)
+
+        # Increment file upload quota tracking (batched with file record commit)
+        await QuotaService.increment_file_uploads(
+            db,
+            final_org_id,
+            user_id=current_user.id,
+            file_size=file_size,
+            metadata={"filename": file.filename, "content_type": content_type},
+        )
+
+        # Commit both file record and quota increment together
         await db.commit()
         await db.refresh(file_record)
 
@@ -190,7 +250,7 @@ async def list_files(
     count_result = await db.execute(
         select(func.count(FileModel.id)).where(
             FileModel.uploaded_by_id == current_user.id,
-            not FileModel.is_deleted,
+            FileModel.is_deleted.is_(False),
         )
     )
     total = count_result.scalar_one()
@@ -200,7 +260,7 @@ async def list_files(
         select(FileModel)
         .where(
             FileModel.uploaded_by_id == current_user.id,
-            not FileModel.is_deleted,
+            FileModel.is_deleted.is_(False),
         )
         .offset(skip)
         .limit(page_size)
@@ -317,4 +377,15 @@ async def delete_file(
 
     # Soft delete
     file.is_deleted = True
+
+    # Decrement storage quota tracking (batched with file deletion)
+    await QuotaService.decrement_storage(
+        db,
+        file.organization_id,
+        file_size=file.size,
+        user_id=current_user.id,
+        metadata={"filename": file.filename, "file_id": str(file.id)},
+    )
+
+    # Commit both file deletion and quota decrement together
     await db.commit()

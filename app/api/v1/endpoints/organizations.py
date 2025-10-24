@@ -20,6 +20,7 @@ from app.schemas.organization import (
 )
 from app.schemas.user import UserResponse
 from app.services.organization import OrganizationService
+from app.services.quota import QuotaService
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -170,8 +171,27 @@ async def add_member(
             detail="Only organization owner can add members",
         )
 
+    # Check user quota before adding member
+    quota = await QuotaService.get_or_create_quota(db, org_id)
+    if quota.is_user_quota_exceeded():
+        raise HTTPException(
+            status_code=429,
+            detail=f"User quota exceeded. Limit: {quota.max_users} users. "
+                   f"Current: {quota.current_users} users.",
+        )
+
     try:
         await OrganizationService.add_member(db, org_id, member_request.user_id)
+
+        # Increment user quota tracking (batched with add member)
+        await QuotaService.increment_users(
+            db,
+            org_id,
+            user_id=current_user.id,
+            metadata={"added_user_id": str(member_request.user_id)},
+        )
+
+        # Commit both member addition and quota increment together
         await db.commit()
     except ValueError as e:
         raise HTTPException(
@@ -205,6 +225,16 @@ async def remove_member(
         )
 
     await OrganizationService.remove_member(db, org_id, member_request.user_id)
+
+    # Decrement user quota tracking (batched with remove member)
+    await QuotaService.decrement_users(
+        db,
+        org_id,
+        user_id=current_user.id,
+        metadata={"removed_user_id": str(member_request.user_id)},
+    )
+
+    # Commit both member removal and quota decrement together
     await db.commit()
 
 

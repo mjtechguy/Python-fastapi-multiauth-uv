@@ -61,3 +61,18 @@ class EmailVerificationRequest(BaseModel):
     """Email verification request schema."""
 
     token: str
+
+
+class MFAChallengeResponse(BaseModel):
+    """MFA challenge response schema."""
+
+    mfa_required: bool = True
+    mfa_token: str
+    message: str = "Multi-factor authentication required"
+
+
+class MFAVerifyRequest(BaseModel):
+    """MFA verification request schema."""
+
+    mfa_token: str
+    totp_code: str

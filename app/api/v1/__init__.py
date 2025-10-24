@@ -1,7 +1,8 @@
 """API v1 router configuration."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.api.v1.dependencies.quota import check_api_quota_optional
 from app.api.v1.endpoints import (
     api_keys,
     audit_logs,
@@ -24,7 +25,9 @@ from app.api.v1.endpoints import (
     websocket,
 )
 
-api_router = APIRouter()
+# Apply optional API quota check to all endpoints
+# This will track API calls for authenticated requests, but skip unauthenticated endpoints
+api_router = APIRouter(dependencies=[Depends(check_api_quota_optional)])
 
 # Include all endpoint routers
 api_router.include_router(health.router)

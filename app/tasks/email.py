@@ -56,7 +56,8 @@ def send_email(
 @celery_app.task
 def send_verification_email(to_email: str, token: str) -> dict[str, str]:
     """Send email verification link."""
-    verification_link = f"{settings.CORS_ORIGINS[0]}/verify-email?token={token}"
+    base_url = settings.get_cors_origins()[0]
+    verification_link = f"{base_url}/verify-email?token={token}"
 
     html_content = f"""
     <html>
@@ -77,7 +78,8 @@ def send_verification_email(to_email: str, token: str) -> dict[str, str]:
 @celery_app.task
 def send_password_reset_email(to_email: str, token: str) -> dict[str, str]:
     """Send password reset link."""
-    reset_link = f"{settings.CORS_ORIGINS[0]}/reset-password?token={token}"
+    base_url = settings.get_cors_origins()[0]
+    reset_link = f"{base_url}/reset-password?token={token}"
 
     html_content = f"""
     <html>

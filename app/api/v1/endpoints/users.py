@@ -86,7 +86,7 @@ async def get_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
-    """Get user by ID."""
+    """Get user by ID (requires superuser or shared organization)."""
     user = await UserService.get_by_id(db, user_id)
 
     if not user:
@@ -94,6 +94,32 @@ async def get_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+
+    # Multi-tenant isolation: check authorization
+    # Allow if:
+    # 1. User is viewing their own profile
+    # 2. User is a superuser
+    # 3. Users share an organization
+    if user_id != current_user.id and not current_user.is_superuser:
+        # Check if users share an organization
+        from app.core.organization_helpers import (
+            check_user_in_organization,
+            get_user_organization_id,
+        )
+
+        try:
+            target_org_id = get_user_organization_id(user)
+            if not check_user_in_organization(current_user, target_org_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied: user belongs to different organization",
+                )
+        except HTTPException:
+            # Target user has no organization - only superuser can view
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied",
+            )
 
     return user
 

@@ -35,15 +35,9 @@ async def setup_totp(
     Returns QR code and backup codes for initial setup.
     """
     try:
-        totp_secret, uri, qr_code = await TOTPService.setup_totp(
+        totp_secret, uri, qr_code, backup_codes = await TOTPService.setup_totp(
             db, current_user, setup_request.device_name
         )
-
-        # Get plain backup codes (before they're hashed)
-        # Note: These are already hashed in the database
-        # We need to return the plain codes during setup
-        from app.models.totp import TOTPSecret
-        backup_codes = TOTPSecret.generate_backup_codes()
 
         await db.commit()
 

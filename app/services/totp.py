@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.encryption import encryption_service
 from app.core.security import get_password_hash, verify_password
 from app.models.totp import TOTPSecret
 from app.models.user import User
@@ -83,7 +84,7 @@ class TOTPService:
     @staticmethod
     async def setup_totp(
         db: AsyncSession, user: User, device_name: str | None = None
-    ) -> tuple[TOTPSecret, str, str]:
+    ) -> tuple[TOTPSecret, str, str, list[str]]:
         """
         Set up TOTP for a user.
 
@@ -93,7 +94,7 @@ class TOTPService:
             device_name: Optional device name
 
         Returns:
-            Tuple of (TOTPSecret, provisioning_uri, qr_code_base64)
+            Tuple of (TOTPSecret, provisioning_uri, qr_code_base64, plaintext_backup_codes)
         """
         # Check if TOTP already exists
         result = await db.execute(
@@ -106,6 +107,7 @@ class TOTPService:
 
         # Generate new secret
         secret = TOTPService.generate_secret()
+        encrypted_secret = encryption_service.encrypt(secret)
 
         # Generate backup codes
         backup_codes = TOTPSecret.generate_backup_codes()
@@ -113,7 +115,7 @@ class TOTPService:
 
         if existing:
             # Update existing
-            existing.secret = secret
+            existing.encrypted_secret = encrypted_secret
             existing.backup_codes = hashed_backup_codes
             existing.device_name = device_name
             existing.is_enabled = False
@@ -123,7 +125,7 @@ class TOTPService:
             # Create new
             totp_secret = TOTPSecret(
                 user_id=user.id,
-                secret=secret,
+                encrypted_secret=encrypted_secret,
                 backup_codes=hashed_backup_codes,
                 device_name=device_name,
             )
@@ -136,7 +138,8 @@ class TOTPService:
         uri = TOTPService.get_totp_uri(secret, user.email)
         qr_code = TOTPService.generate_qr_code(uri)
 
-        return totp_secret, uri, qr_code
+        # Return plaintext backup codes (only time they're ever returned)
+        return totp_secret, uri, qr_code, backup_codes
 
     @staticmethod
     async def enable_totp(
@@ -167,8 +170,9 @@ class TOTPService:
         if totp_secret.is_enabled:
             raise ValueError("TOTP already enabled")
 
-        # Verify token
-        if not TOTPService.verify_totp(totp_secret.secret, token):
+        # Decrypt secret and verify token
+        decrypted_secret = encryption_service.decrypt(totp_secret.encrypted_secret)
+        if not TOTPService.verify_totp(decrypted_secret, token):
             raise ValueError("Invalid TOTP token")
 
         # Enable TOTP
@@ -240,8 +244,9 @@ class TOTPService:
         if not totp_secret:
             return False
 
-        # Try TOTP token first
-        if TOTPService.verify_totp(totp_secret.secret, token):
+        # Decrypt secret and try TOTP token first
+        decrypted_secret = encryption_service.decrypt(totp_secret.encrypted_secret)
+        if TOTPService.verify_totp(decrypted_secret, token):
             totp_secret.last_used_at = datetime.now(UTC)
             await db.flush()
             return True

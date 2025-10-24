@@ -58,6 +58,25 @@ def create_refresh_token(subject: str | Any) -> str:
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
+def create_mfa_token(subject: str | Any) -> str:
+    """
+    Create a short-lived MFA challenge token.
+
+    This token is issued after successful password authentication
+    and must be exchanged for a full access token by providing
+    a valid TOTP code.
+
+    Args:
+        subject: The subject (user ID) for the token
+
+    Returns:
+        Encoded JWT MFA token string (valid for 5 minutes)
+    """
+    expire = datetime.now(UTC) + timedelta(minutes=5)  # Short-lived
+    to_encode = {"exp": expire, "sub": str(subject), "type": "mfa"}
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
 def verify_token(token: str, token_type: str = "access") -> str | None:
     """
     Verify and decode a JWT token.

@@ -42,7 +42,7 @@ class ResolveDeadLetterTaskRequest(BaseModel):
     """Request to resolve a dead letter task."""
 
     resolution_notes: str = Field(..., description="Notes about the resolution")
-    resolved_by: str = Field(..., description="User who resolved the task")
+    # Note: resolved_by is derived from current_user and not accepted in the request
 
 
 class IgnoreDeadLetterTaskRequest(BaseModel):

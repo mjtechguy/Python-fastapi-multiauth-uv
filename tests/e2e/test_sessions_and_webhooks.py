@@ -59,6 +59,11 @@ class TestWebhooks:
             assert "secret" in webhook
             assert webhook["events"] == webhook_data["events"]
 
+            # Regression test: Verify full secret is returned on creation
+            secret = webhook["secret"]
+            assert len(secret) > 20, "Secret should be substantial length"
+            assert "*" not in secret, "Secret should NOT be masked on creation (only time it's shown)"
+
     @pytest.mark.asyncio
     async def test_list_webhooks(self, authenticated_client: AsyncClient):
         """Test listing webhooks."""
@@ -66,9 +71,15 @@ class TestWebhooks:
         assert response.status_code in [200, 400]
 
         if response.status_code == 200:
-            webhooks = response.json()
-            assert "webhooks" in webhooks
-            assert isinstance(webhooks["webhooks"], list)
+            webhooks_data = response.json()
+            assert "webhooks" in webhooks_data
+            assert isinstance(webhooks_data["webhooks"], list)
+
+            # Regression test: Verify secrets are masked in list
+            for webhook in webhooks_data["webhooks"]:
+                if "secret" in webhook:
+                    secret = webhook["secret"]
+                    assert "*" in secret, "Secrets should be masked in list response"
 
     @pytest.mark.asyncio
     async def test_create_webhook_invalid_events(self, authenticated_client: AsyncClient):
@@ -94,6 +105,7 @@ class TestWebhooks:
 
         if create_response.status_code == 201:
             webhook_id = create_response.json()["id"]
+            full_secret = create_response.json()["secret"]
 
             # Get the webhook
             response = await authenticated_client.get(f"/api/v1/webhooks/{webhook_id}")
@@ -101,6 +113,13 @@ class TestWebhooks:
             webhook = response.json()
             assert webhook["id"] == webhook_id
             assert webhook["url"] == webhook_data["url"]
+
+            # Regression test: Verify secret is masked on GET
+            if "secret" in webhook:
+                masked_secret = webhook["secret"]
+                assert masked_secret != full_secret, "Secret should be masked on GET"
+                assert "*" in masked_secret, "Secret should contain asterisks"
+                assert masked_secret.startswith(full_secret[:8]), "Should show first 8 chars"
 
     @pytest.mark.asyncio
     async def test_get_webhook_not_found(self, authenticated_client: AsyncClient):
@@ -122,6 +141,7 @@ class TestWebhooks:
 
         if create_response.status_code == 201:
             webhook_id = create_response.json()["id"]
+            full_secret = create_response.json()["secret"]
 
             # Update the webhook
             update_data = {
@@ -135,6 +155,12 @@ class TestWebhooks:
             assert updated_webhook["url"] == update_data["url"]
             assert updated_webhook["description"] == update_data["description"]
             assert set(updated_webhook["events"]) == set(update_data["events"])
+
+            # Regression test: Verify secret is masked after update
+            if "secret" in updated_webhook:
+                masked_secret = updated_webhook["secret"]
+                assert masked_secret != full_secret, "Secret should be masked after update"
+                assert "*" in masked_secret, "Secret should contain asterisks"
 
     @pytest.mark.asyncio
     async def test_update_webhook_not_found(self, authenticated_client: AsyncClient):

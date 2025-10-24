@@ -2,7 +2,7 @@
 
 import secrets
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String
@@ -38,8 +38,8 @@ class Invitation(Base):
     # Invitee
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
 
-    # Invitation token
-    token: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    # Invitation token hash (SHA256 hash of token for security)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
 
     # Status
     is_accepted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -67,23 +67,6 @@ class Invitation(Base):
     def generate_token() -> str:
         """Generate secure invitation token."""
         return secrets.token_urlsafe(32)
-
-    @classmethod
-    def create_invitation(
-        cls,
-        organization_id: uuid.UUID,
-        inviter_id: uuid.UUID,
-        email: str,
-        expires_in_days: int = 7,
-    ) -> "Invitation":
-        """Create a new invitation."""
-        return cls(
-            organization_id=organization_id,
-            inviter_id=inviter_id,
-            email=email,
-            token=cls.generate_token(),
-            expires_at=datetime.now(UTC) + timedelta(days=expires_in_days),
-        )
 
     def is_valid(self) -> bool:
         """Check if invitation is still valid."""

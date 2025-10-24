@@ -8,7 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.logging_config import logger
+from app.core.logging_config import get_logger
+
+logger = get_logger(__name__)
 from app.models.billing_event import BillingEvent
 from app.models.invoice import Invoice
 from app.models.payment_method import PaymentMethod

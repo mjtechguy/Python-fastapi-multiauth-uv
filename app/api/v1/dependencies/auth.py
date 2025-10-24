@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,13 +16,17 @@ security = HTTPBearer()
 
 
 async def get_current_user(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     """
     Get current authenticated user from JWT token.
 
+    Populates request.state.user for logging middleware.
+
     Args:
+        request: FastAPI request object
         credentials: HTTP bearer token
         db: Database session
 
@@ -55,6 +59,9 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Inactive user",
         )
+
+    # Populate request state for logging middleware
+    request.state.user = user
 
     return user
 

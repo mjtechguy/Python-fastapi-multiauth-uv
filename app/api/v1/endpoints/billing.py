@@ -11,8 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
 from app.core.config import settings
-from app.core.logging_config import logger
+from app.core.logging_config import get_logger
 from app.db.session import get_db
+
+logger = get_logger(__name__)
 from app.models.invoice import Invoice
 from app.models.organization import Organization
 from app.models.payment_method import PaymentMethod

@@ -6,7 +6,9 @@ from uuid import UUID
 import stripe
 from sqlalchemy import select
 
-from app.core.logging_config import logger
+from app.core.logging_config import get_logger
+
+logger = get_logger(__name__)
 from app.db.session import async_session_maker
 from app.models.organization import Organization
 from app.models.subscription import Subscription

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from user_agents import parse as parse_user_agent
 
 from app.core.config import settings
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
 from app.models.session import UserSession
 from app.models.user import User
 
@@ -102,17 +102,21 @@ class SessionService:
         Returns:
             Session if found and valid
         """
-        # Hash the token to compare
-        token_hash = get_password_hash(refresh_token)
-
+        # Get all active, non-revoked sessions to verify token against
         result = await db.execute(
             select(UserSession).where(
-                UserSession.token_hash == token_hash,
-                UserSession.is_active,
-                not UserSession.revoked,
+                UserSession.is_active.is_(True),
+                UserSession.revoked.is_(False),
             )
         )
-        session = result.scalar_one_or_none()
+        sessions = result.scalars().all()
+
+        # Find session with matching token hash
+        session = None
+        for s in sessions:
+            if verify_password(refresh_token, s.token_hash):
+                session = s
+                break
 
         if session and session.is_valid:
             # Update last activity

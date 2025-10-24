@@ -29,10 +29,10 @@ class TOTPSecret(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
     )
 
-    # TOTP secret (encrypted in production)
-    secret: Mapped[str] = mapped_column(String(255), nullable=False)
+    # TOTP secret (encrypted using Fernet encryption)
+    encrypted_secret: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # Backup codes (hashed)
+    # Backup codes (hashed with bcrypt)
     backup_codes: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
 
     # Status

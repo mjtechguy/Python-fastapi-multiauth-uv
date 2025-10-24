@@ -90,10 +90,15 @@ async def update_quota_limits(
     if not orgs:
         raise HTTPException(status_code=400, detail="User does not belong to an organization")
 
-    # TODO: Add permission check - only org admins/owners should be able to update quotas
-    # For now, allowing any authenticated user
+    organization = orgs[0]
+    organization_id = organization.id
 
-    organization_id = orgs[0].id
+    # Check if user is organization owner (only owners can update quotas)
+    if organization.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only organization owners can update quota limits"
+        )
 
     # Update limits
     await QuotaService.update_limits(
@@ -105,6 +110,9 @@ async def update_quota_limits(
         max_file_uploads_per_day=request.max_file_uploads_per_day,
         max_file_size_bytes=request.max_file_size_bytes,
     )
+
+    # Commit quota limit updates
+    await db.commit()
 
     status = await get_quota_status(current_user, db)
 

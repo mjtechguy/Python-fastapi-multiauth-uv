@@ -8,8 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.logging_config import logger
+from app.core.logging_config import get_logger
+
+logger = get_logger(__name__)
 from app.db.session import get_db
+from app.models.billing_event import BillingEvent
 from app.models.organization import Organization
 from app.models.subscription import Subscription
 from app.services.billing_service import BillingService
@@ -62,8 +65,8 @@ async def handle_stripe_webhook(
 
     # Check for duplicate event (idempotency)
     existing_event = await db.execute(
-        select(BillingService).where(
-            BillingService.stripe_event_id == event.id
+        select(BillingEvent).where(
+            BillingEvent.stripe_event_id == event.id
         )
     )
     if existing_event.scalar_one_or_none():

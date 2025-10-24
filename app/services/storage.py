@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 import boto3
+import magic
 from botocore.exceptions import ClientError
 from PIL import Image
 
@@ -172,7 +173,11 @@ class LocalStorageService(StorageService):
     async def upload(
         self, file: BinaryIO, filename: str, content_type: str, org_id: str | None = None, user_id: str | None = None
     ) -> tuple[str, str]:
-        """Upload file to local filesystem with optional organization/user path."""
+        """
+        Upload file to local filesystem with optional organization/user path.
+
+        Uses streaming to avoid loading entire file into memory.
+        """
         # Generate unique filename
         file_ext = Path(filename).suffix
         unique_filename = f"{uuid.uuid4()}{file_ext}"
@@ -191,10 +196,13 @@ class LocalStorageService(StorageService):
         upload_dir = self.base_path / Path(*path_parts)
         upload_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save file
+        # Stream file to disk in chunks (avoid loading entire file into memory)
         file_path = upload_dir / unique_filename
+        chunk_size = 8192  # 8KB chunks
+
         with open(file_path, "wb") as f:
-            f.write(file.read())
+            while chunk := file.read(chunk_size):
+                f.write(chunk)
 
         # Return relative path
         relative_path = str(Path(*path_parts) / unique_filename)
@@ -279,6 +287,51 @@ class FileStorageService:
     def validate_file_size(size: int, max_size: int) -> bool:
         """Validate file size."""
         return size <= max_size
+
+    @staticmethod
+    def verify_mime_type(file: BinaryIO, claimed_type: str | None = None) -> str:
+        """
+        Verify actual MIME type of file using magic bytes.
+
+        This reads the file header to determine the actual content type,
+        preventing malicious files from being uploaded with fake extensions.
+
+        Args:
+            file: File-like object
+            claimed_type: Optional claimed content type from headers
+
+        Returns:
+            Actual MIME type detected from file content
+
+        Raises:
+            ValueError: If file type cannot be determined or is suspicious
+        """
+        # Read first 2048 bytes for MIME detection
+        file.seek(0)
+        header = file.read(2048)
+        file.seek(0)
+
+        if not header:
+            raise ValueError("Empty file or unable to read file header")
+
+        # Detect MIME type using python-magic
+        mime = magic.Magic(mime=True)
+        actual_type = mime.from_buffer(header)
+
+        # If claimed type provided, verify it matches
+        if claimed_type and actual_type != claimed_type:
+            # Allow some flexibility for text types
+            if not (
+                (claimed_type.startswith("text/") and actual_type.startswith("text/"))
+                or (claimed_type == "application/octet-stream")  # Generic type
+            ):
+                raise ValueError(
+                    f"MIME type mismatch: claimed {claimed_type}, "
+                    f"but actual content is {actual_type}. "
+                    "This may indicate a malicious file."
+                )
+
+        return actual_type
 
     @staticmethod
     def optimize_image(file: BinaryIO, max_width: int = 1920) -> BinaryIO:

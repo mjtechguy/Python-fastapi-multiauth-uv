@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
@@ -10,6 +10,8 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
+    MFAChallengeResponse,
+    MFAVerifyRequest,
     OAuthCallback,
     OAuthURLResponse,
     RefreshTokenRequest,
@@ -95,29 +97,32 @@ async def register(
     await OrganizationService.add_member(db, default_org.id, user.id)
 
     # Create email verification token and send email
+    from app.core.encryption import EncryptionService
     from app.models.token import EmailVerificationToken
     from app.tasks.email import send_verification_email
 
     token = EmailVerificationToken.generate_token()
+    token_hash = EncryptionService.hash_token(token)
     verification_token = EmailVerificationToken(
         user_id=user.id,
-        token=token,
+        token_hash=token_hash,
         expires_at=EmailVerificationToken.get_expiration(),
     )
     db.add(verification_token)
     await db.commit()
 
-    # Send verification email asynchronously
+    # Send verification email asynchronously (plaintext token sent once)
     send_verification_email.delay(user.email, token)
 
     return user
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=Token | MFAChallengeResponse)
 async def login(
     credentials: LoginRequest,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
-) -> Token:
+) -> Token | MFAChallengeResponse:
     """
     Login with email and password.
 
@@ -126,19 +131,81 @@ async def login(
         db: Database session
 
     Returns:
-        Access and refresh tokens
+        - Token: If no MFA required
+        - MFAChallengeResponse: If MFA required (user must call /login/mfa)
 
     Raises:
         HTTPException: If credentials are invalid
     """
-    user, token = await AuthService.authenticate_local(
-        db, credentials.email, credentials.password
+    # Extract user agent and IP address
+    user_agent = request.headers.get("user-agent")
+    ip_address = request.client.host if request.client else None
+
+    user, result = await AuthService.authenticate_local(
+        db=db,
+        email=credentials.email,
+        password=credentials.password,
+        user_agent=user_agent,
+        ip_address=ip_address,
+    )
+
+    if not user or not result:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Check if MFA is required (result is a string MFA token)
+    if isinstance(result, str):
+        return MFAChallengeResponse(
+            mfa_required=True,
+            mfa_token=result,
+            message="Multi-factor authentication required. Please provide TOTP code.",
+        )
+
+    # No MFA required, return full token
+    return result
+
+
+@router.post("/login/mfa", response_model=Token)
+async def verify_mfa(
+    mfa_request: MFAVerifyRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Token:
+    """
+    Complete MFA challenge and get access tokens.
+
+    This endpoint is called after receiving an MFAChallengeResponse from /login.
+    The user must provide the MFA token and a valid TOTP code.
+
+    Args:
+        mfa_request: MFA verification request with token and TOTP code
+        db: Database session
+
+    Returns:
+        Access and refresh tokens
+
+    Raises:
+        HTTPException: If MFA verification fails
+    """
+    # Extract user agent and IP address
+    user_agent = request.headers.get("user-agent")
+    ip_address = request.client.host if request.client else None
+
+    user, token = await AuthService.verify_mfa(
+        db=db,
+        mfa_token=mfa_request.mfa_token,
+        totp_code=mfa_request.totp_code,
+        user_agent=user_agent,
+        ip_address=ip_address,
     )
 
     if not user or not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Invalid MFA token or TOTP code",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -217,7 +284,7 @@ async def oauth_authorize(provider: str) -> OAuthURLResponse:
         state = secrets.token_urlsafe(32)
 
         # Store state in Redis with 10-minute expiration
-        await cache.set(f"oauth_state:{state}", provider, ex=600)
+        await cache.set(f"oauth_state:{state}", provider, expire=600)
 
         # Get OAuth client and create authorization URL
         client = await AuthService.get_oauth_client(provider)
@@ -242,6 +309,7 @@ async def oauth_authorize(provider: str) -> OAuthURLResponse:
 async def oauth_callback(
     provider: str,
     callback: OAuthCallback,
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> Token:
     """
@@ -280,11 +348,11 @@ async def oauth_callback(
             detail="Invalid or expired state parameter. Please try again.",
         )
 
-    # Verify provider matches
-    if cached_provider.decode('utf-8') != provider:
+    # Verify provider matches (cached_provider is already a string from CacheService)
+    if cached_provider != provider:
         logger.warning(
             "oauth_csrf_provider_mismatch",
-            expected_provider=cached_provider.decode('utf-8'),
+            expected_provider=cached_provider,
             received_provider=provider
         )
         raise HTTPException(
@@ -295,8 +363,18 @@ async def oauth_callback(
     # Delete state after successful validation (one-time use)
     await cache.delete(f"oauth_state:{callback.state}")
 
+    # Extract user agent and IP address
+    user_agent = request.headers.get("user-agent")
+    ip_address = request.client.host if request.client else None
+
     # Proceed with OAuth authentication
-    user, token = await AuthService.authenticate_oauth(db, provider, callback.code)
+    user, token = await AuthService.authenticate_oauth(
+        db=db,
+        provider=provider,
+        code=callback.code,
+        user_agent=user_agent,
+        ip_address=ip_address,
+    )
 
     if not user or not token:
         raise HTTPException(
@@ -360,6 +438,7 @@ async def request_password_reset(
     Returns:
         Success message
     """
+    from app.core.encryption import EncryptionService
     from app.models.token import PasswordResetToken
     from app.tasks.email import send_password_reset_email
 
@@ -369,15 +448,16 @@ async def request_password_reset(
     if user:
         # Create reset token
         token = PasswordResetToken.generate_token()
+        token_hash = EncryptionService.hash_token(token)
         reset_token = PasswordResetToken(
             user_id=user.id,
-            token=token,
+            token_hash=token_hash,
             expires_at=PasswordResetToken.get_expiration(),
         )
         db.add(reset_token)
         await db.commit()
 
-        # Send email asynchronously
+        # Send email asynchronously (plaintext token sent once)
         send_password_reset_email.delay(user.email, token)
 
     # Always return success (prevent email enumeration)
@@ -407,12 +487,14 @@ async def reset_password(
     """
     from sqlalchemy import select
 
+    from app.core.encryption import EncryptionService
     from app.core.security import get_password_hash
     from app.models.token import PasswordResetToken
 
-    # Find token
+    # Hash the provided token and find by hash
+    token_hash = EncryptionService.hash_token(request.token)
     result = await db.execute(
-        select(PasswordResetToken).where(PasswordResetToken.token == request.token)
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
     )
     reset_token = result.scalar_one_or_none()
 
@@ -463,11 +545,13 @@ async def verify_email(
     """
     from sqlalchemy import select
 
+    from app.core.encryption import EncryptionService
     from app.models.token import EmailVerificationToken
 
-    # Find token
+    # Hash the provided token and find by hash
+    token_hash = EncryptionService.hash_token(request.token)
     result = await db.execute(
-        select(EmailVerificationToken).where(EmailVerificationToken.token == request.token)
+        select(EmailVerificationToken).where(EmailVerificationToken.token_hash == token_hash)
     )
     verification_token = result.scalar_one_or_none()
 
@@ -511,6 +595,7 @@ async def resend_verification(
     Returns:
         Success message
     """
+    from app.core.encryption import EncryptionService
     from app.models.token import EmailVerificationToken
     from app.tasks.email import send_verification_email
 
@@ -520,15 +605,16 @@ async def resend_verification(
     if user and not user.is_verified:
         # Create verification token
         token = EmailVerificationToken.generate_token()
+        token_hash = EncryptionService.hash_token(token)
         verification_token = EmailVerificationToken(
             user_id=user.id,
-            token=token,
+            token_hash=token_hash,
             expires_at=EmailVerificationToken.get_expiration(),
         )
         db.add(verification_token)
         await db.commit()
 
-        # Send email asynchronously
+        # Send email asynchronously (plaintext token sent once)
         send_verification_email.delay(user.email, token)
 
     # Always return success (prevent email enumeration)

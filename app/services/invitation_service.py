@@ -81,17 +81,30 @@ class InvitationService:
                 "Cancel or wait for it to expire before sending a new one."
             )
 
-        # Create invitation
-        invitation = Invitation.create_invitation(
+        # Generate token and hash it
+        from datetime import timedelta
+
+        from app.core.encryption import EncryptionService
+
+        plaintext_token = Invitation.generate_token()
+        token_hash = EncryptionService.hash_token(plaintext_token)
+
+        # Create invitation with hashed token
+        invitation = Invitation(
             organization_id=organization_id,
             inviter_id=inviter_id,
             email=email.lower(),
-            expires_in_days=expires_in_days,
+            token_hash=token_hash,
+            expires_at=datetime.now(UTC) + timedelta(days=expires_in_days),
         )
 
         db.add(invitation)
         await db.flush()
         await db.refresh(invitation)
+
+        # Store plaintext token temporarily so endpoint can return it
+        # This is safe because it's only in memory and returned once
+        invitation.plaintext_token = plaintext_token  # type: ignore
 
         return invitation
 
@@ -112,14 +125,17 @@ class InvitationService:
 
     @staticmethod
     async def get_invitation_by_token(db: AsyncSession, token: str) -> Invitation | None:
-        """Get invitation by token."""
+        """Get invitation by token (hashes token for lookup)."""
+        from app.core.encryption import EncryptionService
+
+        token_hash = EncryptionService.hash_token(token)
         result = await db.execute(
             select(Invitation)
             .options(
                 selectinload(Invitation.organization),
                 selectinload(Invitation.inviter),
             )
-            .where(Invitation.token == token)
+            .where(Invitation.token_hash == token_hash)
         )
         return result.scalar_one_or_none()
 
