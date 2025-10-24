@@ -10,7 +10,7 @@ class APIKeyCreate(BaseModel):
     """Schema for API key creation."""
 
     name: str = Field(min_length=1, max_length=255)
-    expires_at: datetime | None = None
+    expires_in_days: int | None = Field(None, ge=1, le=365, description="Days until expiration (1-365, or None for no expiration)")
 
 
 class APIKeyResponse(BaseModel):

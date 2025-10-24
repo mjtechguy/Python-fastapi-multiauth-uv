@@ -1,27 +1,27 @@
 """Team management endpoints."""
 
+from math import ceil
 from typing import Annotated
 from uuid import UUID
-from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.team import (
-    TeamCreate,
-    TeamUpdate,
-    TeamResponse,
-    TeamListResponse,
-    TeamWithMembers,
     AddTeamMemberRequest,
     RemoveTeamMemberRequest,
+    TeamCreate,
+    TeamListResponse,
+    TeamResponse,
+    TeamUpdate,
+    TeamWithMembers,
 )
 from app.schemas.user import UserResponse
-from app.services.team import TeamService
 from app.services.organization import OrganizationService
+from app.services.team import TeamService
 from app.services.user import UserService
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -337,7 +337,7 @@ async def list_team_members(
         )
 
     skip = (page - 1) * page_size
-    members, total = await TeamService.list_team_members(
+    members, _total = await TeamService.list_team_members(
         db, team_id, skip=skip, limit=page_size
     )
 

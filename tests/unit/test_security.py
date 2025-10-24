@@ -3,11 +3,11 @@
 import pytest
 
 from app.core.security import (
-    get_password_hash,
-    verify_password,
     create_access_token,
-    verify_token,
+    get_password_hash,
     validate_password_strength,
+    verify_password,
+    verify_token,
 )
 
 
@@ -42,7 +42,7 @@ def test_invalid_token_verification():
 
 
 @pytest.mark.parametrize(
-    "password,expected_valid",
+    ("password", "expected_valid"),
     [
         ("Test123!", True),
         ("weak", False),  # Too short

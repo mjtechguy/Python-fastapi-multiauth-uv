@@ -1,33 +1,33 @@
 """File upload and management endpoints."""
 
+from math import ceil
 from typing import Annotated
 from uuid import UUID
-from math import ceil
 
 from fastapi import (
     APIRouter,
     Depends,
     File,
     HTTPException,
+    Query,
     UploadFile,
     status,
-    Query,
 )
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.file import File as FileModel
 from app.models.user import User
 from app.schemas.file import (
-    FileUploadResponse,
-    FileResponse,
-    FileListResponse,
     FileDownloadResponse,
+    FileListResponse,
+    FileResponse,
+    FileUploadResponse,
 )
 from app.services.storage import storage_service
-from app.core.config import settings
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -172,7 +172,7 @@ async def upload_file(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload file: {str(e)}",
+            detail=f"Failed to upload file: {e!s}",
         )
 
 
@@ -190,7 +190,7 @@ async def list_files(
     count_result = await db.execute(
         select(func.count(FileModel.id)).where(
             FileModel.uploaded_by_id == current_user.id,
-            FileModel.is_deleted == False,
+            not FileModel.is_deleted,
         )
     )
     total = count_result.scalar_one()
@@ -200,7 +200,7 @@ async def list_files(
         select(FileModel)
         .where(
             FileModel.uploaded_by_id == current_user.id,
-            FileModel.is_deleted == False,
+            not FileModel.is_deleted,
         )
         .offset(skip)
         .limit(page_size)
@@ -284,7 +284,7 @@ async def get_download_url(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate download URL: {str(e)}",
+            detail=f"Failed to generate download URL: {e!s}",
         )
 
 

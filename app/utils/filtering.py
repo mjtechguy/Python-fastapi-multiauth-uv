@@ -1,6 +1,7 @@
 """Filtering utilities for API queries."""
 
 from typing import Any
+
 from sqlalchemy import Select
 from sqlalchemy.sql import ColumnElement
 

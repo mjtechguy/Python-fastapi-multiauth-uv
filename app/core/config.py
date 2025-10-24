@@ -1,13 +1,11 @@
 """Application configuration management."""
 
-from typing import Any, Literal
+from typing import Literal
+
 from pydantic import (
-    AnyHttpUrl,
     Field,
     PostgresDsn,
     RedisDsn,
-    field_validator,
-    ValidationInfo,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,7 +21,7 @@ class Settings(BaseSettings):
     )
 
     # Application
-    APP_NAME: str = "SaaS Backend Framework"
+    APP_NAME: str = "FastAPI Super SaaS Boilerplate"
     APP_ENV: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"

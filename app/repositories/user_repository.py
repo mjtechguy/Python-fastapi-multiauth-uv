@@ -48,6 +48,6 @@ class UserRepository(BaseRepository[User]):
     async def get_active_users(self, skip: int = 0, limit: int = 100) -> list[User]:
         """Get all active users."""
         result = await self.db.execute(
-            select(User).where(User.is_active == True).offset(skip).limit(limit)
+            select(User).where(User.is_active).offset(skip).limit(limit)
         )
         return list(result.scalars().all())

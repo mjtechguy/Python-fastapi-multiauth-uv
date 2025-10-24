@@ -18,7 +18,6 @@ class PermissionBase(BaseModel):
 class PermissionCreate(PermissionBase):
     """Schema for permission creation."""
 
-    pass
 
 
 class PermissionResponse(PermissionBase):

@@ -1,11 +1,12 @@
 """PyPI package version checking tasks."""
 
-import httpx
 import re
 from pathlib import Path
 
-from app.tasks.celery_app import celery_app
+import httpx
+
 from app.core.logging_config import get_logger
+from app.tasks.celery_app import celery_app
 
 logger = get_logger(__name__)
 

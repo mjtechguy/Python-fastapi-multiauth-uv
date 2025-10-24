@@ -1,7 +1,7 @@
 """Payment method models for billing."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
@@ -60,13 +60,13 @@ class PaymentMethod(Base):
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
 
@@ -84,10 +84,9 @@ class PaymentMethod(Base):
         if self.type == "card":
             brand = self.card_brand.capitalize() if self.card_brand else "Card"
             return f"{brand} ending in {self.card_last4}"
-        elif self.type == "us_bank_account":
+        if self.type == "us_bank_account":
             return f"{self.bank_name or 'Bank'} ending in {self.bank_last4}"
-        else:
-            return self.type.replace("_", " ").title()
+        return self.type.replace("_", " ").title()
 
     @property
     def is_expired(self) -> bool:
@@ -95,7 +94,7 @@ class PaymentMethod(Base):
         if self.type != "card" or not self.card_exp_month or not self.card_exp_year:
             return False
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Card expires at end of expiration month
         return (
             self.card_exp_year < now.year

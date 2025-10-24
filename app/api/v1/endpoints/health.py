@@ -2,12 +2,13 @@
 
 import time
 from typing import Any
-from fastapi import APIRouter, Depends, status as http_status
+
+from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
 from app.core.config import settings
+from app.db.session import get_db
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -116,13 +117,13 @@ async def redis_health() -> dict[str, Any]:
             # Get keyspace info
             keyspace_info = await redis_client.info("keyspace")
             total_keys = 0
-            for db_name, db_info in keyspace_info.items():
+            for _db_name, db_info in keyspace_info.items():
                 if isinstance(db_info, dict):
                     total_keys += db_info.get("keys", 0)
             redis_info["total_keys"] = total_keys
 
         except Exception as e:
-            redis_info = {"error": f"Could not fetch Redis info: {str(e)}"}
+            redis_info = {"error": f"Could not fetch Redis info: {e!s}"}
 
         if result == test_value:
             return {
@@ -135,13 +136,12 @@ async def redis_health() -> dict[str, Any]:
                 },
                 "memory": redis_info,
             }
-        else:
-            return {
-                "status": "unhealthy",
-                "redis": "connected",
-                "read_write": "failed",
-                "error": "Read/write test failed",
-            }
+        return {
+            "status": "unhealthy",
+            "redis": "connected",
+            "read_write": "failed",
+            "error": "Read/write test failed",
+        }
     except Exception as e:
         return {
             "status": "unhealthy",
@@ -204,9 +204,10 @@ async def celery_health() -> dict[str, Any]:
 @router.get("/storage")
 async def storage_health() -> dict[str, Any]:
     """Storage service health check endpoint with performance and space metrics."""
-    from app.services.storage import storage_service
-    from io import BytesIO
     import os
+    from io import BytesIO
+
+    from app.services.storage import storage_service
 
     try:
         # Test write with performance measurement
@@ -215,7 +216,7 @@ async def storage_health() -> dict[str, Any]:
         test_filename = "health_check_test.txt"
 
         start_time = time.perf_counter()
-        storage_path, provider, checksum = await storage_service.upload(
+        storage_path, provider, _checksum = await storage_service.upload(
             test_file, test_filename, "text/plain"
         )
         upload_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -256,7 +257,7 @@ async def storage_health() -> dict[str, Any]:
             else:
                 space_info = {"available": "unknown"}
         except Exception as e:
-            space_info = {"error": f"Could not fetch space info: {str(e)}"}
+            space_info = {"error": f"Could not fetch space info: {e!s}"}
 
         if downloaded_content == test_content:
             return {
@@ -270,14 +271,13 @@ async def storage_health() -> dict[str, Any]:
                 },
                 "space": space_info,
             }
-        else:
-            return {
-                "status": "unhealthy",
-                "storage": "connected",
-                "provider": provider,
-                "read_write": "failed",
-                "error": "Read/write test failed",
-            }
+        return {
+            "status": "unhealthy",
+            "storage": "connected",
+            "provider": provider,
+            "read_write": "failed",
+            "error": "Read/write test failed",
+        }
     except Exception as e:
         return {
             "status": "unhealthy",

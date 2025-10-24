@@ -2,10 +2,10 @@
 
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, String, Boolean
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -24,7 +24,7 @@ class PasswordResetToken(Base):
     token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     used: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="password_reset_tokens")
@@ -37,11 +37,11 @@ class PasswordResetToken(Base):
     @staticmethod
     def get_expiration() -> datetime:
         """Get expiration datetime (1 hour from now)."""
-        return datetime.now(timezone.utc) + timedelta(hours=1)
+        return datetime.now(UTC) + timedelta(hours=1)
 
     def is_expired(self) -> bool:
         """Check if token is expired."""
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def is_valid(self) -> bool:
         """Check if token is valid (not used and not expired)."""
@@ -58,7 +58,7 @@ class EmailVerificationToken(Base):
     token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     used: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="email_verification_tokens")
@@ -71,11 +71,11 @@ class EmailVerificationToken(Base):
     @staticmethod
     def get_expiration() -> datetime:
         """Get expiration datetime (24 hours from now)."""
-        return datetime.now(timezone.utc) + timedelta(hours=24)
+        return datetime.now(UTC) + timedelta(hours=24)
 
     def is_expired(self) -> bool:
         """Check if token is expired."""
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def is_valid(self) -> bool:
         """Check if token is valid (not used and not expired)."""

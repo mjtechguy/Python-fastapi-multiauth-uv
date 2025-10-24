@@ -1,14 +1,16 @@
 """Celery tasks for webhook delivery."""
 
 import uuid
+from datetime import UTC
 from typing import Any
 
+from sqlalchemy import select
+
+from app.db.session import AsyncSessionLocal
+from app.models.webhook import WebhookDelivery
+from app.services.webhook import WebhookService
 from app.tasks.celery_app import celery_app
 from app.tasks.task_utils import BaseTaskWithDLQ
-from app.db.session import AsyncSessionLocal
-from app.services.webhook import WebhookService
-from app.models.webhook import WebhookDelivery
-from sqlalchemy import select
 
 
 @celery_app.task(
@@ -115,7 +117,7 @@ def retry_failed_webhooks_task() -> dict[str, Any]:
         Dictionary with retry statistics
     """
     import asyncio
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     async def _retry():
         async with AsyncSessionLocal() as db:
@@ -123,7 +125,7 @@ def retry_failed_webhooks_task() -> dict[str, Any]:
             result = await db.execute(
                 select(WebhookDelivery).where(
                     WebhookDelivery.status == "retrying",
-                    WebhookDelivery.next_retry_at <= datetime.now(timezone.utc),
+                    WebhookDelivery.next_retry_at <= datetime.now(UTC),
                 )
             )
             deliveries = list(result.scalars().all())

@@ -1,15 +1,15 @@
 """Unit tests for QuotaService with subscription integration."""
 
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.quota import QuotaService
 from app.models.quota import OrganizationQuota
 from app.models.subscription import Subscription
+from app.services.quota import QuotaService
 
 
 @pytest.fixture
@@ -29,8 +29,8 @@ def sample_subscription():
         stripe_customer_id="cus_test_123",
         status="active",
         cancel_at_period_end=False,
-        current_period_start=datetime.now(timezone.utc),
-        current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
+        current_period_start=datetime.now(UTC),
+        current_period_end=datetime.now(UTC) + timedelta(days=30),
     )
 
 
@@ -72,7 +72,7 @@ class TestSubscriptionStatusChecks:
     async def test_check_subscription_trialing_success(self, mock_db, sample_subscription):
         """Test trialing subscription passes check."""
         sample_subscription.status = "trialing"
-        sample_subscription.trial_end = datetime.now(timezone.utc) + timedelta(days=7)
+        sample_subscription.trial_end = datetime.now(UTC) + timedelta(days=7)
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = sample_subscription
@@ -303,7 +303,7 @@ class TestQuotaResetLogic:
     async def test_monthly_quota_reset_when_needed(self, mock_db, sample_quota):
         """Test monthly quota resets after 30 days."""
         # Set reset date to 31 days ago
-        sample_quota.api_calls_reset_at = datetime.now(timezone.utc) - timedelta(days=31)
+        sample_quota.api_calls_reset_at = datetime.now(UTC) - timedelta(days=31)
         sample_quota.current_api_calls_this_month = 5000
 
         quota = await QuotaService.check_and_reset_monthly_quotas(mock_db, sample_quota)
@@ -314,7 +314,7 @@ class TestQuotaResetLogic:
     async def test_daily_quota_reset_when_needed(self, mock_db, sample_quota):
         """Test daily quota resets after 1 day."""
         # Set reset date to 2 days ago
-        sample_quota.file_uploads_reset_at = datetime.now(timezone.utc) - timedelta(days=2)
+        sample_quota.file_uploads_reset_at = datetime.now(UTC) - timedelta(days=2)
         sample_quota.current_file_uploads_today = 50
 
         quota = await QuotaService.check_and_reset_daily_quotas(mock_db, sample_quota)

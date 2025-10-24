@@ -43,6 +43,8 @@ celery_app.conf.update(
 
 
 # Celery signal handlers for application-level DLQ
+from datetime import UTC
+
 from celery import signals
 
 from app.core.logging_config import get_logger
@@ -62,7 +64,8 @@ def handle_task_failure(sender=None, task_id=None, exception=None, args=None, kw
     NOTE: Uses synchronous database connection to avoid asyncio.run() issues
     in signal handlers (creating new event loops can cause crashes).
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     from app.db.session import SyncSessionLocal
     from app.models.dead_letter import DeadLetterTask
 
@@ -93,7 +96,7 @@ def handle_task_failure(sender=None, task_id=None, exception=None, args=None, kw
                 task_kwargs=dict(kwargs) if kwargs else None,
                 retry_count=retry_count,
                 status="failed",
-                failed_at=datetime.now(timezone.utc),
+                failed_at=datetime.now(UTC),
             )
             db.add(dead_letter)
             db.commit()

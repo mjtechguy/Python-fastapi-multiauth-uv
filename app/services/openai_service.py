@@ -1,8 +1,8 @@
 """OpenAI and LLM integration service with provider abstraction."""
 
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
-import httpx
 from openai import AsyncOpenAI
 
 from app.core.config import settings

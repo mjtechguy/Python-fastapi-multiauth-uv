@@ -1,24 +1,24 @@
 """User model and related associations."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Table, Column
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
 if TYPE_CHECKING:
-    from app.models.organization import Organization
-    from app.models.team import Team
-    from app.models.role import Role
-    from app.models.oauth import OAuthAccount
     from app.models.api_key import APIKey
-    from app.models.totp import TOTPSecret
+    from app.models.oauth import OAuthAccount
+    from app.models.organization import Organization
+    from app.models.role import Role
     from app.models.session import UserSession
-    from app.models.token import PasswordResetToken, EmailVerificationToken
+    from app.models.team import Team
+    from app.models.token import EmailVerificationToken, PasswordResetToken
+    from app.models.totp import TOTPSecret
 
 
 # Association table for user-organization membership
@@ -29,7 +29,7 @@ user_organizations = Table(
     Column(
         "organization_id", UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE")
     ),
-    Column("created_at", DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)),
+    Column("created_at", DateTime(timezone=True), default=lambda: datetime.now(UTC)),
 )
 
 # Association table for user-team membership
@@ -38,7 +38,7 @@ user_teams = Table(
     Base.metadata,
     Column("user_id", UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")),
     Column("team_id", UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE")),
-    Column("created_at", DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)),
+    Column("created_at", DateTime(timezone=True), default=lambda: datetime.now(UTC)),
 )
 
 # Association table for user-role assignment
@@ -49,7 +49,7 @@ user_roles = Table(
     Column("role_id", UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE")),
     Column("organization_id", UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True),
     Column("team_id", UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"), nullable=True),
-    Column("created_at", DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)),
+    Column("created_at", DateTime(timezone=True), default=lambda: datetime.now(UTC)),
 )
 
 
@@ -80,12 +80,12 @@ class User(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
 

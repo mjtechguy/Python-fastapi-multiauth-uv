@@ -1,5 +1,5 @@
 [project]
-name = "saas-backend-framework"
+name = "fastapi-super-saas-boilerplate"
 version = "0.1.0"
 description = "Production-grade FastAPI backend framework for scalable SaaS applications"
 readme = "README.md"
@@ -110,7 +110,34 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "DTZ", "T10", "ISC", "ICN", "PIE", "PT", "RSE", "RET", "SIM", "ARG", "PTH", "ERA", "PD", "PL", "NPY", "RUF"]
-ignore = ["E501", "PLR0913", "PLR2004"]
+ignore = [
+    "E501",      # Line too long
+    "PLR0913",   # Too many arguments
+    "PLR2004",   # Magic value comparison
+    "PLR0912",   # Too many branches
+    "PLR0911",   # Too many return statements
+    "B008",      # Function call in argument defaults (FastAPI pattern)
+    "B904",      # Raise without from (sometimes intentional)
+    "B017",      # Assert raises exception (pytest pattern)
+    "PLC0415",   # Import outside top-level (lazy imports, avoid circular deps)
+    "ERA001",    # Commented-out code (sometimes kept for reference)
+    "ARG001",    # Unused function argument (Celery/signal handlers)
+    "ARG002",    # Unused method argument
+    "ARG004",    # Unused static method argument
+    "E402",      # Module import not at top (after conditional imports)
+    "A002",      # Builtin shadowing (id is common param name)
+    "N818",      # Exception naming convention
+    "SIM102",    # Use single if (sometimes clearer as nested)
+    "SIM117",    # Multiple with statements (sometimes clearer as nested)
+    "RUF005",    # Iterable unpacking (list concat sometimes clearer)
+    "RUF012",    # Mutable class attributes (ClassVar not always needed)
+    "PTH110",    # os.path.exists (backward compat)
+    "PTH120",    # os.path.dirname (backward compat)
+    "PTH123",    # open() vs Path.open (backward compat)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["DTZ003", "DTZ005", "F841", "PT011"]  # Test files: datetime usage, unused vars, broad except
 
 [tool.mypy]
 python_version = "3.12"

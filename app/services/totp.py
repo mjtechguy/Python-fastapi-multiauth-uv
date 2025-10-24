@@ -2,7 +2,7 @@
 
 import base64
 import io
-from typing import Tuple
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pyotp
@@ -83,7 +83,7 @@ class TOTPService:
     @staticmethod
     async def setup_totp(
         db: AsyncSession, user: User, device_name: str | None = None
-    ) -> Tuple[TOTPSecret, str, str]:
+    ) -> tuple[TOTPSecret, str, str]:
         """
         Set up TOTP for a user.
 
@@ -174,7 +174,7 @@ class TOTPService:
         # Enable TOTP
         totp_secret.is_enabled = True
         totp_secret.is_verified = True
-        totp_secret.enabled_at = datetime.now(timezone.utc)
+        totp_secret.enabled_at = datetime.now(UTC)
 
         await db.flush()
         await db.refresh(totp_secret)
@@ -232,7 +232,7 @@ class TOTPService:
         result = await db.execute(
             select(TOTPSecret).where(
                 TOTPSecret.user_id == user.id,
-                TOTPSecret.is_enabled == True
+                TOTPSecret.is_enabled
             )
         )
         totp_secret = result.scalar_one_or_none()
@@ -242,7 +242,7 @@ class TOTPService:
 
         # Try TOTP token first
         if TOTPService.verify_totp(totp_secret.secret, token):
-            totp_secret.last_used_at = datetime.now(timezone.utc)
+            totp_secret.last_used_at = datetime.now(UTC)
             await db.flush()
             return True
 
@@ -251,7 +251,7 @@ class TOTPService:
             if verify_password(token, hashed_code):
                 # Remove used backup code
                 totp_secret.backup_codes.remove(hashed_code)
-                totp_secret.last_used_at = datetime.now(timezone.utc)
+                totp_secret.last_used_at = datetime.now(UTC)
                 await db.flush()
                 return True
 
@@ -294,7 +294,7 @@ class TOTPService:
         result = await db.execute(
             select(TOTPSecret).where(
                 TOTPSecret.user_id == user.id,
-                TOTPSecret.is_enabled == True
+                TOTPSecret.is_enabled
             )
         )
         totp_secret = result.scalar_one_or_none()

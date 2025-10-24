@@ -1,7 +1,8 @@
 """E2E tests for file upload and storage."""
 
-import pytest
 import io
+
+import pytest
 from httpx import AsyncClient
 
 
@@ -300,8 +301,8 @@ class TestFileDelete:
             pytest.skip("File upload not configured")
 
         # Create another user
+        from app.core.security import create_access_token, get_password_hash
         from app.models.user import User
-        from app.core.security import get_password_hash, create_access_token
 
         other_user = User(
             email="otheruser@example.com",

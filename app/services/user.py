@@ -1,9 +1,9 @@
 """User service for user management operations."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -86,7 +86,7 @@ class UserService:
     @staticmethod
     async def update_last_login(db: AsyncSession, user: User) -> None:
         """Update user's last login timestamp."""
-        user.last_login = datetime.now(timezone.utc)
+        user.last_login = datetime.now(UTC)
         user.failed_login_attempts = 0
         user.locked_until = None
         await db.flush()
@@ -101,7 +101,7 @@ class UserService:
         if user.failed_login_attempts >= settings.MAX_LOGIN_ATTEMPTS:
             from datetime import timedelta
 
-            user.locked_until = datetime.now(timezone.utc) + timedelta(
+            user.locked_until = datetime.now(UTC) + timedelta(
                 minutes=settings.LOCKOUT_DURATION_MINUTES
             )
 
@@ -113,10 +113,7 @@ class UserService:
         if user.locked_until is None:
             return False
 
-        if user.locked_until > datetime.now(timezone.utc):
-            return True
-
-        return False
+        return user.locked_until > datetime.now(UTC)
 
     @staticmethod
     async def list_users(

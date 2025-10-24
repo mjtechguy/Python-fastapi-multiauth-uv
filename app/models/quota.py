@@ -1,10 +1,10 @@
 """Usage quota models for SaaS monetization."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, BigInteger, DateTime
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,12 +42,12 @@ class OrganizationQuota(Base):
     max_file_size_bytes: Mapped[int] = mapped_column(BigInteger, default=10_485_760)  # 10MB
 
     # Tracking timestamps
-    api_calls_reset_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
-    file_uploads_reset_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    api_calls_reset_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
+    file_uploads_reset_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
     last_updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization", back_populates="quota")
@@ -76,19 +76,19 @@ class OrganizationQuota(Base):
         """Get usage percentage for a specific quota type."""
         if quota_type == "users":
             return (self.current_users / self.max_users * 100) if self.max_users > 0 else 0
-        elif quota_type == "storage":
+        if quota_type == "storage":
             return (
                 (self.current_storage_bytes / self.max_storage_bytes * 100)
                 if self.max_storage_bytes > 0
                 else 0
             )
-        elif quota_type == "api_calls":
+        if quota_type == "api_calls":
             return (
                 (self.current_api_calls_this_month / self.max_api_calls_per_month * 100)
                 if self.max_api_calls_per_month > 0
                 else 0
             )
-        elif quota_type == "file_uploads":
+        if quota_type == "file_uploads":
             return (
                 (self.current_file_uploads_today / self.max_file_uploads_per_day * 100)
                 if self.max_file_uploads_per_day > 0
@@ -117,7 +117,7 @@ class UsageLog(Base):
     extra_data: Mapped[dict | None] = mapped_column(JSONB, default=None, nullable=True)
 
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True)
 
     # Relationships
     organization: Mapped["Organization"] = relationship("Organization")

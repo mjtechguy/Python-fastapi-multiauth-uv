@@ -10,13 +10,13 @@ from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.quota import (
+    QuotaLimits,
     QuotaStatus,
+    QuotaUsage,
     UpdateQuotaLimitsRequest,
     UpdateQuotaLimitsResponse,
-    QuotaLimits,
-    QuotaUsage,
-    UsageLogListResponse,
     UsageLogEntry,
+    UsageLogListResponse,
 )
 from app.services.quota import QuotaService
 
@@ -96,7 +96,7 @@ async def update_quota_limits(
     organization_id = orgs[0].id
 
     # Update limits
-    quota = await QuotaService.update_limits(
+    await QuotaService.update_limits(
         db,
         organization_id,
         max_users=request.max_users,

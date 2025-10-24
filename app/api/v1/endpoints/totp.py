@@ -9,14 +9,14 @@ from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.totp import (
-    TOTPSetupRequest,
-    TOTPSetupResponse,
-    TOTPEnableRequest,
-    TOTPVerifyRequest,
-    TOTPDisableRequest,
-    TOTPStatusResponse,
     RegenerateBackupCodesRequest,
     RegenerateBackupCodesResponse,
+    TOTPDisableRequest,
+    TOTPEnableRequest,
+    TOTPSetupRequest,
+    TOTPSetupResponse,
+    TOTPStatusResponse,
+    TOTPVerifyRequest,
 )
 from app.services.totp import TOTPService
 

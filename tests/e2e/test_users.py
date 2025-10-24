@@ -106,8 +106,8 @@ class TestUserList:
     async def test_list_users_as_superuser(self, client: AsyncClient, db_session):
         """Test listing users as superuser."""
         # Create superuser
+        from app.core.security import create_access_token, get_password_hash
         from app.models.user import User
-        from app.core.security import get_password_hash, create_access_token
 
         superuser = User(
             email="superadmin@example.com",
@@ -144,8 +144,8 @@ class TestUserList:
     async def test_list_users_pagination(self, client: AsyncClient, db_session):
         """Test user list pagination."""
         # Create superuser
+        from app.core.security import create_access_token, get_password_hash
         from app.models.user import User
-        from app.core.security import get_password_hash, create_access_token
 
         superuser = User(
             email="paginated_admin@example.com",
@@ -204,8 +204,8 @@ class TestDeleteUser:
     async def test_delete_user_as_superuser(self, client: AsyncClient, db_session):
         """Test deleting user as superuser."""
         # Create superuser and target user
+        from app.core.security import create_access_token, get_password_hash
         from app.models.user import User
-        from app.core.security import get_password_hash, create_access_token
 
         superuser = User(
             email="delete_admin@example.com",
@@ -253,8 +253,8 @@ class TestDeleteUser:
     async def test_delete_nonexistent_user(self, client: AsyncClient, db_session):
         """Test deleting non-existent user."""
         # Create superuser
+        from app.core.security import create_access_token, get_password_hash
         from app.models.user import User
-        from app.core.security import get_password_hash, create_access_token
 
         superuser = User(
             email="delete_notfound_admin@example.com",

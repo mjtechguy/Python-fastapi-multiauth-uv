@@ -1,11 +1,11 @@
 """Session management service."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
-from user_agents import parse as parse_user_agent
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from user_agents import parse as parse_user_agent
 
 from app.core.config import settings
 from app.core.security import get_password_hash
@@ -68,7 +68,7 @@ class SessionService:
             device_info = SessionService.parse_user_agent(user_agent)
 
         # Calculate expiration
-        expires_at = datetime.now(timezone.utc) + timedelta(
+        expires_at = datetime.now(UTC) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
         )
 
@@ -108,15 +108,15 @@ class SessionService:
         result = await db.execute(
             select(UserSession).where(
                 UserSession.token_hash == token_hash,
-                UserSession.is_active == True,
-                UserSession.revoked == False,
+                UserSession.is_active,
+                not UserSession.revoked,
             )
         )
         session = result.scalar_one_or_none()
 
         if session and session.is_valid:
             # Update last activity
-            session.last_activity = datetime.now(timezone.utc)
+            session.last_activity = datetime.now(UTC)
             await db.flush()
             return session
 
@@ -141,8 +141,8 @@ class SessionService:
 
         if not include_expired:
             query = query.where(
-                UserSession.is_active == True,
-                UserSession.revoked == False,
+                UserSession.is_active,
+                not UserSession.revoked,
             )
 
         result = await db.execute(query.order_by(UserSession.last_activity.desc()))
@@ -175,7 +175,7 @@ class SessionService:
             return False
 
         session.revoked = True
-        session.revoked_at = datetime.now(timezone.utc)
+        session.revoked_at = datetime.now(UTC)
         session.is_active = False
         await db.flush()
 
@@ -198,8 +198,8 @@ class SessionService:
         """
         query = select(UserSession).where(
             UserSession.user_id == user_id,
-            UserSession.is_active == True,
-            UserSession.revoked == False,
+            UserSession.is_active,
+            not UserSession.revoked,
         )
 
         if except_session_id:
@@ -211,7 +211,7 @@ class SessionService:
         revoked_count = 0
         for session in sessions:
             session.revoked = True
-            session.revoked_at = datetime.now(timezone.utc)
+            session.revoked_at = datetime.now(UTC)
             session.is_active = False
             revoked_count += 1
 
@@ -232,14 +232,14 @@ class SessionService:
         # Delete sessions that are either:
         # 1. Expired for more than 7 days
         # 2. Revoked for more than 30 days
-        cutoff_expired = datetime.now(timezone.utc) - timedelta(days=7)
-        cutoff_revoked = datetime.now(timezone.utc) - timedelta(days=30)
+        cutoff_expired = datetime.now(UTC) - timedelta(days=7)
+        cutoff_revoked = datetime.now(UTC) - timedelta(days=30)
 
         result = await db.execute(
             delete(UserSession).where(
                 (UserSession.expires_at < cutoff_expired)
                 | (
-                    (UserSession.revoked == True)
+                    (UserSession.revoked)
                     & (UserSession.revoked_at < cutoff_revoked)
                 )
             )
@@ -260,7 +260,7 @@ class SessionService:
         Returns:
             Dictionary with session counts
         """
-        from sqlalchemy import func, Integer
+        from sqlalchemy import Integer, func
 
         # Get all sessions
         result = await db.execute(
@@ -279,5 +279,5 @@ class SessionService:
         return {
             "total": row.total,
             "active": len([s for s in active_sessions if s.is_valid]),
-            "devices": len(set(s.device_type for s in active_sessions if s.device_type)),
+            "devices": len({s.device_type for s in active_sessions if s.device_type}),
         }

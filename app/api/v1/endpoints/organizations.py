@@ -1,21 +1,21 @@
 """Organization management endpoints."""
 
+from math import ceil
 from typing import Annotated
 from uuid import UUID
-from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.organization import (
-    OrganizationResponse,
-    OrganizationCreate,
-    OrganizationUpdate,
-    OrganizationListResponse,
     AddMemberRequest,
+    OrganizationCreate,
+    OrganizationListResponse,
+    OrganizationResponse,
+    OrganizationUpdate,
     RemoveMemberRequest,
 )
 from app.schemas.user import UserResponse
@@ -232,5 +232,4 @@ async def list_members(
         )
 
     # Get all members
-    members = await OrganizationService.list_members(db, org_id)
-    return members
+    return await OrganizationService.list_members(db, org_id)

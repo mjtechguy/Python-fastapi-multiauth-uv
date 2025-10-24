@@ -1,44 +1,42 @@
 """Billing and subscription management endpoints."""
 
+from math import ceil
 from typing import Annotated
 from uuid import UUID
-from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select, func
+import stripe
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.api.v1.dependencies import get_current_user
+from app.core.config import settings
+from app.core.logging_config import logger
 from app.db.session import get_db
-from app.models.user import User
+from app.models.invoice import Invoice
 from app.models.organization import Organization
+from app.models.payment_method import PaymentMethod
+from app.models.quota import OrganizationQuota
 from app.models.subscription import Subscription
 from app.models.subscription_plan import SubscriptionPlan
-from app.models.payment_method import PaymentMethod
-from app.models.invoice import Invoice
-from app.models.quota import OrganizationQuota
+from app.models.user import User
 from app.schemas.billing import (
-    SubscriptionPlanResponse,
-    SubscriptionResponse,
+    BillingUsageResponse,
     CheckoutSessionCreate,
     CheckoutSessionResponse,
     CustomerPortalCreate,
     CustomerPortalResponse,
-    SubscriptionUpgradeRequest,
-    SubscriptionCancelRequest,
+    InvoiceListResponse,
+    InvoiceResponse,
     PaymentMethodCreate,
     PaymentMethodResponse,
-    InvoiceResponse,
-    InvoiceListResponse,
-    BillingUsageResponse,
+    SubscriptionCancelRequest,
+    SubscriptionPlanResponse,
+    SubscriptionResponse,
+    SubscriptionUpgradeRequest,
 )
 from app.services.billing_service import BillingService
 from app.services.stripe_service import StripeService
-from app.core.config import settings
-from app.core.logging_config import logger
-
-import stripe
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -89,8 +87,7 @@ async def list_plans(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> list[SubscriptionPlan]:
     """List all available subscription plans."""
-    plans = await BillingService.list_active_plans(db)
-    return plans
+    return await BillingService.list_active_plans(db)
 
 
 # ============================================================================
@@ -197,10 +194,10 @@ async def create_checkout_session(
         )
 
     except stripe.error.StripeError as e:
-        logger.error(f"Stripe checkout error: {str(e)}")
+        logger.error(f"Stripe checkout error: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create checkout session: {str(e)}",
+            detail=f"Failed to create checkout session: {e!s}",
         )
 
 
@@ -232,10 +229,10 @@ async def upgrade_subscription(
             detail=str(e),
         )
     except stripe.error.StripeError as e:
-        logger.error(f"Stripe upgrade error: {str(e)}")
+        logger.error(f"Stripe upgrade error: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upgrade subscription: {str(e)}",
+            detail=f"Failed to upgrade subscription: {e!s}",
         )
 
 
@@ -276,10 +273,10 @@ async def cancel_subscription(
             detail=str(e),
         )
     except stripe.error.StripeError as e:
-        logger.error(f"Stripe cancel error: {str(e)}")
+        logger.error(f"Stripe cancel error: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to cancel subscription: {str(e)}",
+            detail=f"Failed to cancel subscription: {e!s}",
         )
 
 
@@ -304,10 +301,10 @@ async def resume_subscription(
             detail=str(e),
         )
     except stripe.error.StripeError as e:
-        logger.error(f"Stripe resume error: {str(e)}")
+        logger.error(f"Stripe resume error: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to resume subscription: {str(e)}",
+            detail=f"Failed to resume subscription: {e!s}",
         )
 
 
@@ -368,12 +365,12 @@ async def add_payment_method(
             await db.execute(
                 select(PaymentMethod)
                 .where(PaymentMethod.organization_id == org.id)
-                .where(PaymentMethod.is_default == True)
+                .where(PaymentMethod.is_default)
             )
             existing_defaults = await db.execute(
                 select(PaymentMethod)
                 .where(PaymentMethod.organization_id == org.id)
-                .where(PaymentMethod.is_default == True)
+                .where(PaymentMethod.is_default)
             )
             for pm in existing_defaults.scalars():
                 pm.is_default = False
@@ -387,10 +384,10 @@ async def add_payment_method(
         return payment_method
 
     except stripe.error.StripeError as e:
-        logger.error(f"Stripe payment method error: {str(e)}")
+        logger.error(f"Stripe payment method error: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to add payment method: {str(e)}",
+            detail=f"Failed to add payment method: {e!s}",
         )
 
 
@@ -427,10 +424,10 @@ async def remove_payment_method(
         await db.commit()
 
     except stripe.error.StripeError as e:
-        logger.error(f"Stripe detach error: {str(e)}")
+        logger.error(f"Stripe detach error: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to remove payment method: {str(e)}",
+            detail=f"Failed to remove payment method: {e!s}",
         )
 
 
@@ -476,7 +473,7 @@ async def set_default_payment_method(
         existing_defaults = await db.execute(
             select(PaymentMethod)
             .where(PaymentMethod.organization_id == org.id)
-            .where(PaymentMethod.is_default == True)
+            .where(PaymentMethod.is_default)
         )
         for pm in existing_defaults.scalars():
             pm.is_default = False
@@ -488,10 +485,10 @@ async def set_default_payment_method(
         return payment_method
 
     except stripe.error.StripeError as e:
-        logger.error(f"Stripe set default error: {str(e)}")
+        logger.error(f"Stripe set default error: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to set default payment method: {str(e)}",
+            detail=f"Failed to set default payment method: {e!s}",
         )
 
 
@@ -601,10 +598,10 @@ async def create_portal_session(
         return CustomerPortalResponse(portal_url=session.url)
 
     except stripe.error.StripeError as e:
-        logger.error(f"Stripe portal error: {str(e)}")
+        logger.error(f"Stripe portal error: {e!s}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create portal session: {str(e)}",
+            detail=f"Failed to create portal session: {e!s}",
         )
 
 

@@ -1,16 +1,16 @@
 """User management endpoints."""
 
+from math import ceil
 from typing import Annotated
 from uuid import UUID
-from math import ceil
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.dependencies import get_current_user, get_current_superuser
+from app.api.v1.dependencies import get_current_superuser, get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserResponse, UserUpdate, UserPasswordUpdate, UserListResponse
+from app.schemas.user import UserListResponse, UserPasswordUpdate, UserResponse, UserUpdate
 from app.services.user import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])

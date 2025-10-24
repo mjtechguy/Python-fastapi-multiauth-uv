@@ -125,3 +125,84 @@ class FeatureFlagService:
 
         # Invalidate cache
         await cache.delete(f"feature_flag:{flag_name}")
+
+    @staticmethod
+    async def get_flag_by_id(db: AsyncSession, flag_id: UUID) -> FeatureFlag | None:
+        """Get feature flag by ID."""
+        result = await db.execute(
+            select(FeatureFlag).where(FeatureFlag.id == flag_id)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_flag_by_name(db: AsyncSession, name: str) -> FeatureFlag | None:
+        """Get feature flag by name."""
+        result = await db.execute(
+            select(FeatureFlag).where(FeatureFlag.name == name)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def list_flags(
+        db: AsyncSession,
+        enabled_only: bool = False,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[FeatureFlag], int]:
+        """List all feature flags with pagination."""
+        from sqlalchemy import func
+
+        conditions = []
+        if enabled_only:
+            conditions.append(FeatureFlag.is_enabled)
+
+        where_clause = conditions[0] if conditions else True
+
+        # Get total count
+        count_result = await db.execute(
+            select(func.count(FeatureFlag.id)).where(where_clause)
+        )
+        total = count_result.scalar_one()
+
+        # Get flags
+        result = await db.execute(
+            select(FeatureFlag)
+            .where(where_clause)
+            .order_by(FeatureFlag.name)
+            .offset(skip)
+            .limit(limit)
+        )
+        flags = list(result.scalars().all())
+
+        return flags, total
+
+    @staticmethod
+    async def update_flag_targeting(
+        db: AsyncSession,
+        flag: FeatureFlag,
+        targeting_rules: dict,
+    ) -> FeatureFlag:
+        """Update feature flag targeting rules."""
+        flag.targeting_rules = targeting_rules
+        await db.flush()
+        await db.refresh(flag)
+
+        # Invalidate cache
+        await cache.delete(f"feature_flag:{flag.name}")
+
+        return flag
+
+    @staticmethod
+    async def check_user_access(
+        db: AsyncSession,
+        flag_name: str,
+        user_id: UUID,
+        user_email: str,
+    ) -> bool:
+        """Check if a specific user has access to a feature."""
+        flag = await FeatureFlagService.get_flag_by_name(db, flag_name)
+
+        if not flag:
+            return False
+
+        return flag.is_enabled_for_user(user_id, user_email)

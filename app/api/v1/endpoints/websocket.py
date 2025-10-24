@@ -1,12 +1,12 @@
 """WebSocket endpoints for real-time features."""
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, status
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
-from app.services.websocket_manager import ws_manager
 from app.core.security import verify_token
+from app.db.session import get_db
 from app.services.user import UserService
+from app.services.websocket_manager import ws_manager
 
 router = APIRouter(prefix="/ws", tags=["websocket"])
 

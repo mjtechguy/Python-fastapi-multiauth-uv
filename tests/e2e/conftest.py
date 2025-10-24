@@ -1,15 +1,15 @@
 """E2E test fixtures and configuration."""
 
 import asyncio
+from collections.abc import AsyncGenerator, Generator
+
 import pytest
-from typing import AsyncGenerator, Generator
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.main import app
-from app.db.session import Base, get_db
 from app.core.config import settings
-
+from app.db.session import Base, get_db
+from app.main import app
 
 # Test database URL (use a separate test database)
 TEST_DATABASE_URL = str(settings.DATABASE_URL).replace("/saas_backend", "/saas_backend_test")

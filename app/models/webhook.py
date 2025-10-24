@@ -1,10 +1,10 @@
 """Webhook models for event notifications."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String, Text, Integer
+from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -45,9 +45,9 @@ class Webhook(Base):
     last_failure_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC), index=True)
     updated_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc)
+        default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
 
     # Relationships
@@ -85,7 +85,7 @@ class WebhookDelivery(Base):
     next_retry_at: Mapped[datetime | None] = mapped_column(nullable=True, index=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC), index=True)
     delivered_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     # Relationships

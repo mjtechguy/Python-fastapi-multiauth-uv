@@ -10,18 +10,16 @@ from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.webhook import (
+    AvailableEventsResponse,
     WebhookCreate,
-    WebhookUpdate,
-    WebhookResponse,
-    WebhookListResponse,
     WebhookDeliveryListResponse,
-    WebhookDeliveryResponse,
+    WebhookListResponse,
+    WebhookResponse,
     WebhookTestRequest,
     WebhookTestResponse,
-    AvailableEventsResponse,
+    WebhookUpdate,
 )
 from app.services.webhook import WebhookService
-from app.tasks.webhook import deliver_webhook_task
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -46,14 +44,13 @@ async def create_webhook(
         raise HTTPException(status_code=400, detail="User does not belong to an organization")
 
     try:
-        webhook = await WebhookService.create_webhook(
+        return await WebhookService.create_webhook(
             db,
             current_user.organization_id,
             request.url,
             request.events,
             request.description,
         )
-        return webhook
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -116,7 +113,7 @@ async def update_webhook(
         raise HTTPException(status_code=403, detail="Access denied")
 
     try:
-        updated = await WebhookService.update_webhook(
+        return await WebhookService.update_webhook(
             db,
             webhook_id,
             url=request.url,
@@ -124,7 +121,6 @@ async def update_webhook(
             events=request.events,
             is_active=request.is_active,
         )
-        return updated
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

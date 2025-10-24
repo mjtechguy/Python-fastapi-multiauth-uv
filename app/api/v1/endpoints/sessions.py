@@ -3,13 +3,13 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.session import SessionResponse, SessionListResponse, SessionStatsResponse
+from app.schemas.session import SessionListResponse, SessionResponse, SessionStatsResponse
 from app.services.session import SessionService
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -29,10 +29,9 @@ async def list_sessions(
     sessions = await SessionService.get_user_sessions(db, current_user.id)
 
     # Get current session token from request (if available)
-    current_token = None
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
-        current_token = auth_header.split(" ")[1]
+        auth_header.split(" ")[1]
 
     # Mark current session
     session_responses = []

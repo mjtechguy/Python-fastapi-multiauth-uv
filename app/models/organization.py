@@ -1,23 +1,23 @@
 """Organization model for multi-tenancy."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
-    from app.models.team import Team
+    from app.models.billing_event import BillingEvent
+    from app.models.invoice import Invoice
+    from app.models.payment_method import PaymentMethod
     from app.models.quota import OrganizationQuota
     from app.models.subscription import Subscription
-    from app.models.payment_method import PaymentMethod
-    from app.models.invoice import Invoice
-    from app.models.billing_event import BillingEvent
+    from app.models.team import Team
+    from app.models.user import User
 
 
 class Organization(Base):
@@ -45,12 +45,12 @@ class Organization(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
 

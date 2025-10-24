@@ -1,6 +1,5 @@
 """Authentication service supporting multiple auth strategies."""
 
-from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -80,46 +79,43 @@ class AuthService:
                 redirect_uri=settings.GOOGLE_REDIRECT_URI,
                 scope="openid email profile",
             )
-        elif provider == "github":
+        if provider == "github":
             return AsyncOAuth2Client(
                 client_id=settings.GITHUB_CLIENT_ID,
                 client_secret=settings.GITHUB_CLIENT_SECRET,
                 redirect_uri=settings.GITHUB_REDIRECT_URI,
                 scope="read:user user:email",
             )
-        elif provider == "microsoft":
+        if provider == "microsoft":
             return AsyncOAuth2Client(
                 client_id=settings.MICROSOFT_CLIENT_ID,
                 client_secret=settings.MICROSOFT_CLIENT_SECRET,
                 redirect_uri=settings.MICROSOFT_REDIRECT_URI,
                 scope="openid email profile",
             )
-        else:
-            raise ValueError(f"Unsupported OAuth provider: {provider}")
+        raise ValueError(f"Unsupported OAuth provider: {provider}")
 
     @staticmethod
     def get_oauth_authorize_url(provider: str) -> str:
         """Get OAuth authorization URL for the specified provider."""
         if provider == "google":
             return "https://accounts.google.com/o/oauth2/v2/auth"
-        elif provider == "github":
+        if provider == "github":
             return "https://github.com/login/oauth/authorize"
-        elif provider == "microsoft":
+        if provider == "microsoft":
             return "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
-        else:
-            raise ValueError(f"Unsupported OAuth provider: {provider}")
+        raise ValueError(f"Unsupported OAuth provider: {provider}")
 
     @staticmethod
     def get_oauth_token_url(provider: str) -> str:
         """Get OAuth token URL for the specified provider."""
         if provider == "google":
             return "https://oauth2.googleapis.com/token"
-        elif provider == "github":
+        if provider == "github":
             return "https://github.com/login/oauth/access_token"
-        elif provider == "microsoft":
+        if provider == "microsoft":
             return "https://login.microsoftonline.com/common/oauth2/v2.0/token"
-        else:
-            raise ValueError(f"Unsupported OAuth provider: {provider}")
+        raise ValueError(f"Unsupported OAuth provider: {provider}")
 
     @staticmethod
     async def get_oauth_user_info(provider: str, access_token: str) -> dict[str, Any]:

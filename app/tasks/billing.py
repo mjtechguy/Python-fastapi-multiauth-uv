@@ -1,21 +1,18 @@
 """Celery tasks for billing operations."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+import stripe
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.tasks.celery_app import celery_app
+from app.core.logging_config import logger
 from app.db.session import async_session_maker
-from app.models.subscription import Subscription
 from app.models.organization import Organization
+from app.models.subscription import Subscription
 from app.services.billing_service import BillingService
 from app.services.stripe_service import StripeService
-from app.core.logging_config import logger
-from app.core.config import settings
-
-import stripe
+from app.tasks.celery_app import celery_app
 
 
 @celery_app.task(name="billing.sync_subscription_from_stripe")
@@ -44,7 +41,7 @@ def sync_subscription_from_stripe(subscription_id: str) -> dict[str, str]:
 
                 if not subscription:
                     logger.warning(
-                        f"Subscription not found for sync",
+                        "Subscription not found for sync",
                         extra={"subscription_id": subscription_id},
                     )
                     return {"status": "not_found"}
@@ -60,7 +57,7 @@ def sync_subscription_from_stripe(subscription_id: str) -> dict[str, str]:
                 await db.commit()
 
                 logger.info(
-                    f"Synced subscription from Stripe",
+                    "Synced subscription from Stripe",
                     extra={"subscription_id": subscription_id},
                 )
 
@@ -68,14 +65,14 @@ def sync_subscription_from_stripe(subscription_id: str) -> dict[str, str]:
 
             except stripe.error.StripeError as e:
                 logger.error(
-                    f"Stripe error during sync",
+                    "Stripe error during sync",
                     extra={"subscription_id": subscription_id, "error": str(e)},
                 )
                 return {"status": "error", "error": str(e)}
 
             except Exception as e:
                 logger.error(
-                    f"Error syncing subscription",
+                    "Error syncing subscription",
                     extra={"subscription_id": subscription_id, "error": str(e)},
                 )
                 return {"status": "error", "error": str(e)}
@@ -108,7 +105,7 @@ def update_organization_quotas(organization_id: str) -> dict[str, str]:
 
                 if not subscription:
                     logger.warning(
-                        f"No subscription found",
+                        "No subscription found",
                         extra={"organization_id": organization_id},
                     )
                     return {"status": "no_subscription"}
@@ -121,7 +118,7 @@ def update_organization_quotas(organization_id: str) -> dict[str, str]:
                 await db.commit()
 
                 logger.info(
-                    f"Updated organization quotas",
+                    "Updated organization quotas",
                     extra={"organization_id": organization_id},
                 )
 
@@ -129,7 +126,7 @@ def update_organization_quotas(organization_id: str) -> dict[str, str]:
 
             except Exception as e:
                 logger.error(
-                    f"Error updating quotas",
+                    "Error updating quotas",
                     extra={"organization_id": organization_id, "error": str(e)},
                 )
                 return {"status": "error", "error": str(e)}
@@ -190,7 +187,7 @@ def send_billing_notification(organization_id: str, event_type: str, **kwargs) -
                 # await send_email_async(**email_data)
 
                 logger.info(
-                    f"Sent billing notification",
+                    "Sent billing notification",
                     extra={
                         "organization_id": organization_id,
                         "event_type": event_type,
@@ -202,7 +199,7 @@ def send_billing_notification(organization_id: str, event_type: str, **kwargs) -
 
             except Exception as e:
                 logger.error(
-                    f"Error sending billing notification",
+                    "Error sending billing notification",
                     extra={
                         "organization_id": organization_id,
                         "event_type": event_type,
@@ -230,8 +227,8 @@ def check_trial_expiring() -> dict[str, int]:
         async with async_session_maker() as db:
             try:
                 # Find subscriptions with trials ending in 3 days
-                three_days_from_now = datetime.now(timezone.utc) + timedelta(days=3)
-                two_days_from_now = datetime.now(timezone.utc) + timedelta(days=2)
+                three_days_from_now = datetime.now(UTC) + timedelta(days=3)
+                two_days_from_now = datetime.now(UTC) + timedelta(days=2)
 
                 result = await db.execute(
                     select(Subscription).where(
@@ -250,7 +247,7 @@ def check_trial_expiring() -> dict[str, int]:
                         "trial_ending",
                         trial_end=subscription.trial_end.isoformat(),
                         days_remaining=(
-                            subscription.trial_end - datetime.now(timezone.utc)
+                            subscription.trial_end - datetime.now(UTC)
                         ).days,
                     )
                     count += 1
@@ -264,7 +261,7 @@ def check_trial_expiring() -> dict[str, int]:
 
             except Exception as e:
                 logger.error(
-                    f"Error checking trial expiring",
+                    "Error checking trial expiring",
                     extra={"error": str(e)},
                 )
                 return {"count": 0, "error": str(e)}
@@ -312,7 +309,7 @@ def check_payment_failures() -> dict[str, int]:
 
             except Exception as e:
                 logger.error(
-                    f"Error checking payment failures",
+                    "Error checking payment failures",
                     extra={"error": str(e)},
                 )
                 return {"count": 0, "error": str(e)}
@@ -370,7 +367,7 @@ def report_usage_to_stripe(organization_id: str) -> dict[str, str]:
                 # )
 
                 logger.info(
-                    f"Reported usage to Stripe",
+                    "Reported usage to Stripe",
                     extra={
                         "organization_id": organization_id,
                         "api_calls": quota.current_api_calls_this_month,
@@ -381,7 +378,7 @@ def report_usage_to_stripe(organization_id: str) -> dict[str, str]:
 
             except Exception as e:
                 logger.error(
-                    f"Error reporting usage to Stripe",
+                    "Error reporting usage to Stripe",
                     extra={"organization_id": organization_id, "error": str(e)},
                 )
                 return {"status": "error", "error": str(e)}

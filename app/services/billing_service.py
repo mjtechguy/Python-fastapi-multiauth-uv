@@ -1,26 +1,21 @@
 """Billing service for managing subscriptions and billing logic."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
-from decimal import Decimal
 
+import stripe
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.config import settings
 from app.core.logging_config import logger
+from app.models.billing_event import BillingEvent
+from app.models.invoice import Invoice
+from app.models.payment_method import PaymentMethod
+from app.models.quota import OrganizationQuota
 from app.models.subscription import Subscription
 from app.models.subscription_plan import SubscriptionPlan
-from app.models.payment_method import PaymentMethod
-from app.models.invoice import Invoice
-from app.models.billing_event import BillingEvent
-from app.models.organization import Organization
-from app.models.quota import OrganizationQuota
 from app.services.stripe_service import StripeService
-from app.services.quota import QuotaService
-
-import stripe
 
 
 class BillingService:
@@ -51,7 +46,7 @@ class BillingService:
         """List all active subscription plans."""
         result = await db.execute(
             select(SubscriptionPlan)
-            .where(SubscriptionPlan.is_active == True)
+            .where(SubscriptionPlan.is_active)
             .order_by(SubscriptionPlan.tier_level)
         )
         return list(result.scalars().all())
@@ -81,7 +76,7 @@ class BillingService:
         if not free_plan:
             raise ValueError("Free plan not found")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         subscription = Subscription(
             organization_id=organization_id,
             plan_id=free_plan.id,
@@ -118,21 +113,21 @@ class BillingService:
 
         # Parse dates from Stripe
         current_period_start = datetime.fromtimestamp(
-            stripe_subscription.current_period_start, tz=timezone.utc
+            stripe_subscription.current_period_start, tz=UTC
         )
         current_period_end = datetime.fromtimestamp(
-            stripe_subscription.current_period_end, tz=timezone.utc
+            stripe_subscription.current_period_end, tz=UTC
         )
 
         trial_start = None
         trial_end = None
         if stripe_subscription.trial_start:
             trial_start = datetime.fromtimestamp(
-                stripe_subscription.trial_start, tz=timezone.utc
+                stripe_subscription.trial_start, tz=UTC
             )
         if stripe_subscription.trial_end:
             trial_end = datetime.fromtimestamp(
-                stripe_subscription.trial_end, tz=timezone.utc
+                stripe_subscription.trial_end, tz=UTC
             )
 
         subscription = Subscription(
@@ -176,27 +171,27 @@ class BillingService:
 
         if stripe_subscription.canceled_at:
             subscription.canceled_at = datetime.fromtimestamp(
-                stripe_subscription.canceled_at, tz=timezone.utc
+                stripe_subscription.canceled_at, tz=UTC
             )
 
         subscription.current_period_start = datetime.fromtimestamp(
-            stripe_subscription.current_period_start, tz=timezone.utc
+            stripe_subscription.current_period_start, tz=UTC
         )
         subscription.current_period_end = datetime.fromtimestamp(
-            stripe_subscription.current_period_end, tz=timezone.utc
+            stripe_subscription.current_period_end, tz=UTC
         )
 
         if stripe_subscription.trial_start:
             subscription.trial_start = datetime.fromtimestamp(
-                stripe_subscription.trial_start, tz=timezone.utc
+                stripe_subscription.trial_start, tz=UTC
             )
         if stripe_subscription.trial_end:
             subscription.trial_end = datetime.fromtimestamp(
-                stripe_subscription.trial_end, tz=timezone.utc
+                stripe_subscription.trial_end, tz=UTC
             )
 
         subscription.stripe_metadata = dict(stripe_subscription.metadata or {})
-        subscription.updated_at = datetime.now(timezone.utc)
+        subscription.updated_at = datetime.now(UTC)
 
         logger.info(
             "Updated subscription from Stripe",
@@ -357,7 +352,7 @@ class BillingService:
         quota.max_api_calls_per_month = plan.max_api_calls_per_month
         quota.max_file_uploads_per_day = plan.max_file_uploads_per_day
         quota.max_file_size_bytes = plan.max_file_size_bytes
-        quota.last_updated_at = datetime.now(timezone.utc)
+        quota.last_updated_at = datetime.now(UTC)
 
         await db.flush()
 
@@ -450,9 +445,9 @@ class BillingService:
             invoice.amount_remaining = stripe_invoice.amount_remaining
             if stripe_invoice.paid_at:
                 invoice.paid_at = datetime.fromtimestamp(
-                    stripe_invoice.paid_at, tz=timezone.utc
+                    stripe_invoice.paid_at, tz=UTC
                 )
-            invoice.updated_at = datetime.now(timezone.utc)
+            invoice.updated_at = datetime.now(UTC)
         else:
             # Create new invoice
             invoice = Invoice(
@@ -476,19 +471,19 @@ class BillingService:
 
             if stripe_invoice.period_start:
                 invoice.period_start = datetime.fromtimestamp(
-                    stripe_invoice.period_start, tz=timezone.utc
+                    stripe_invoice.period_start, tz=UTC
                 )
             if stripe_invoice.period_end:
                 invoice.period_end = datetime.fromtimestamp(
-                    stripe_invoice.period_end, tz=timezone.utc
+                    stripe_invoice.period_end, tz=UTC
                 )
             if stripe_invoice.due_date:
                 invoice.due_date = datetime.fromtimestamp(
-                    stripe_invoice.due_date, tz=timezone.utc
+                    stripe_invoice.due_date, tz=UTC
                 )
             if stripe_invoice.status_transitions.paid_at:
                 invoice.paid_at = datetime.fromtimestamp(
-                    stripe_invoice.status_transitions.paid_at, tz=timezone.utc
+                    stripe_invoice.status_transitions.paid_at, tz=UTC
                 )
 
             invoice.stripe_metadata = dict(stripe_invoice.metadata or {})

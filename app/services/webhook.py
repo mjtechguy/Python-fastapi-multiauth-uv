@@ -4,11 +4,11 @@ import hashlib
 import hmac
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.webhook import Webhook, WebhookDelivery
@@ -87,7 +87,7 @@ class WebhookService:
             raise ValueError("Webhook not found")
 
         # Validate events if provided
-        if "events" in updates and updates["events"]:
+        if updates.get("events"):
             invalid_events = [e for e in updates["events"] if e not in WebhookService.AVAILABLE_EVENTS]
             if invalid_events:
                 raise ValueError(f"Invalid events: {', '.join(invalid_events)}")
@@ -179,7 +179,7 @@ class WebhookService:
             "event_data": delivery.event_data,
             "delivery_id": str(delivery.id),
             "webhook_id": str(webhook.id),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
 
         # Generate signature
@@ -202,17 +202,17 @@ class WebhookService:
                 delivery.status_code = response.status_code
                 delivery.response_body = response.text[:1000]  # Limit response body size
                 delivery.attempt_count += 1
-                delivery.delivered_at = datetime.now(timezone.utc)
+                delivery.delivered_at = datetime.now(UTC)
 
                 if 200 <= response.status_code < 300:
                     delivery.status = "success"
                     webhook.successful_deliveries += 1
-                    webhook.last_success_at = datetime.now(timezone.utc)
+                    webhook.last_success_at = datetime.now(UTC)
                 else:
                     delivery.status = "failed"
                     delivery.error_message = f"HTTP {response.status_code}"
                     webhook.failed_deliveries += 1
-                    webhook.last_failure_at = datetime.now(timezone.utc)
+                    webhook.last_failure_at = datetime.now(UTC)
 
                     # Schedule retry
                     if delivery.attempt_count < delivery.max_attempts:
@@ -220,25 +220,25 @@ class WebhookService:
                         # Exponential backoff: 5min, 30min, 2h
                         retry_delays = [300, 1800, 7200]
                         delay = retry_delays[min(delivery.attempt_count - 1, len(retry_delays) - 1)]
-                        delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
+                        delivery.next_retry_at = datetime.now(UTC) + timedelta(seconds=delay)
 
         except Exception as e:
             delivery.status = "failed"
             delivery.error_message = str(e)[:1000]
             delivery.attempt_count += 1
-            delivery.delivered_at = datetime.now(timezone.utc)
+            delivery.delivered_at = datetime.now(UTC)
             webhook.failed_deliveries += 1
-            webhook.last_failure_at = datetime.now(timezone.utc)
+            webhook.last_failure_at = datetime.now(UTC)
 
             # Schedule retry
             if delivery.attempt_count < delivery.max_attempts:
                 delivery.status = "retrying"
                 retry_delays = [300, 1800, 7200]
                 delay = retry_delays[min(delivery.attempt_count - 1, len(retry_delays) - 1)]
-                delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=delay)
+                delivery.next_retry_at = datetime.now(UTC) + timedelta(seconds=delay)
 
         webhook.total_deliveries += 1
-        webhook.last_delivery_at = datetime.now(timezone.utc)
+        webhook.last_delivery_at = datetime.now(UTC)
         await db.commit()
 
         return delivery.status == "success"
@@ -255,7 +255,7 @@ class WebhookService:
         result = await db.execute(
             select(Webhook).where(
                 Webhook.organization_id == organization_id,
-                Webhook.is_active == True,
+                Webhook.is_active,
             )
         )
         webhooks = list(result.scalars().all())

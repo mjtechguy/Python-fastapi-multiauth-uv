@@ -1,8 +1,9 @@
 """Tests for OAuth CSRF protection."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from httpx import AsyncClient
-from unittest.mock import patch, AsyncMock
 
 from app.main import app
 from app.services.cache import cache
@@ -236,7 +237,7 @@ class TestOAuthCSRFProtection:
                 states.append(f"state_{i}")
 
         # Verify all states are stored independently
-        for state in states:
+        for _state in states:
             # In production, states would be extracted from URLs
             # For this test, we're verifying the mechanism works
             pass

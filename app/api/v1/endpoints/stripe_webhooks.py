@@ -1,19 +1,19 @@
 """Stripe webhook handler endpoint."""
 
-from fastapi import APIRouter, Request, HTTPException, status, Depends
+from uuid import UUID
+
+import stripe
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+from app.core.logging_config import logger
 from app.db.session import get_db
 from app.models.organization import Organization
 from app.models.subscription import Subscription
 from app.services.billing_service import BillingService
 from app.services.stripe_service import StripeService
-from app.core.config import settings
-from app.core.logging_config import logger
-
-import stripe
-from uuid import UUID
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -56,7 +56,7 @@ async def handle_stripe_webhook(
         )
 
     logger.info(
-        f"Received Stripe webhook event",
+        "Received Stripe webhook event",
         extra={"event_type": event.type, "event_id": event.id},
     )
 
@@ -68,7 +68,7 @@ async def handle_stripe_webhook(
     )
     if existing_event.scalar_one_or_none():
         logger.info(
-            f"Duplicate webhook event, skipping",
+            "Duplicate webhook event, skipping",
             extra={"event_id": event.id},
         )
         return {"status": "duplicate_event"}
@@ -83,7 +83,7 @@ async def handle_stripe_webhook(
             await handle_payment_method_event(db, event)
         else:
             logger.info(
-                f"Unhandled webhook event type",
+                "Unhandled webhook event type",
                 extra={"event_type": event.type},
             )
 
@@ -94,12 +94,12 @@ async def handle_stripe_webhook(
     except Exception as e:
         await db.rollback()
         logger.error(
-            f"Error processing webhook event",
+            "Error processing webhook event",
             extra={"event_type": event.type, "event_id": event.id, "error": str(e)},
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process webhook: {str(e)}",
+            detail=f"Failed to process webhook: {e!s}",
         )
 
 
@@ -389,7 +389,7 @@ async def handle_invoice_payment_succeeded(
 ) -> None:
     """Handle invoice.payment_succeeded event."""
     # Save invoice
-    invoice = await BillingService.save_invoice(db, org_id, invoice_data)
+    await BillingService.save_invoice(db, org_id, invoice_data)
 
     # Log event
     await BillingService.log_billing_event(
@@ -422,7 +422,7 @@ async def handle_invoice_payment_failed(
 ) -> None:
     """Handle invoice.payment_failed event."""
     # Save invoice
-    invoice = await BillingService.save_invoice(db, org_id, invoice_data)
+    await BillingService.save_invoice(db, org_id, invoice_data)
 
     # Update subscription status
     subscription = await BillingService.get_organization_subscription(db, org_id)

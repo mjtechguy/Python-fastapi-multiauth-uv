@@ -1,7 +1,9 @@
 """Helper utilities for Celery tasks with DLQ support."""
 
-from typing import Any, Callable
+from collections.abc import Callable
 from functools import wraps
+from typing import Any
+
 from celery import Task
 
 from app.core.logging_config import get_logger
@@ -47,16 +49,15 @@ def task_with_dlq(max_retries: int = 3, retry_delay: int = 60):
                         exception=str(exc)
                     )
                     raise self.retry(exc=exc, countdown=retry_delay, max_retries=max_retries)
-                else:
-                    # Final failure - will be caught by @signals.task_failure handler
-                    logger.error(
-                        "task_final_failure",
-                        task_id=self.request.id,
-                        task_name=self.name,
-                        retry_count=self.request.retries,
-                        exception=str(exc)
-                    )
-                    raise
+                # Final failure - will be caught by @signals.task_failure handler
+                logger.error(
+                    "task_final_failure",
+                    task_id=self.request.id,
+                    task_name=self.name,
+                    retry_count=self.request.retries,
+                    exception=str(exc)
+                )
+                raise
 
         return wrapper
     return decorator

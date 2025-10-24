@@ -1,18 +1,18 @@
 """Unit tests for BillingService."""
 
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.billing_service import BillingService
-from app.models.subscription_plan import SubscriptionPlan
-from app.models.subscription import Subscription
 from app.models.organization import Organization
 from app.models.quota import OrganizationQuota
+from app.models.subscription import Subscription
+from app.models.subscription_plan import SubscriptionPlan
+from app.services.billing_service import BillingService
 
 
 @pytest.fixture
@@ -215,8 +215,8 @@ class TestSubscriptionUpgrade:
             stripe_subscription_id="sub_test_123",
             stripe_customer_id="cus_test_123",
             status="active",
-            current_period_start=datetime.now(timezone.utc),
-            current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
+            current_period_start=datetime.now(UTC),
+            current_period_end=datetime.now(UTC) + timedelta(days=30),
         )
 
         # Mock database responses
@@ -238,23 +238,21 @@ class TestSubscriptionUpgrade:
         with patch(
             "app.services.stripe_service.StripeService.update_subscription",
             new=AsyncMock(return_value=MagicMock()),
-        ):
-            with patch.object(
-                BillingService,
-                "update_subscription_from_stripe",
-                new=AsyncMock(return_value=subscription),
-            ):
-                with patch.object(
-                    BillingService,
-                    "update_quotas_from_plan",
-                    new=AsyncMock(),
-                ) as mock_update_quotas:
-                    updated_sub = await BillingService.upgrade_subscription(
-                        mock_db, org_id, new_plan_id, "monthly", True
-                    )
+        ), patch.object(
+            BillingService,
+            "update_subscription_from_stripe",
+            new=AsyncMock(return_value=subscription),
+        ), patch.object(
+            BillingService,
+            "update_quotas_from_plan",
+            new=AsyncMock(),
+        ) as mock_update_quotas:
+            updated_sub = await BillingService.upgrade_subscription(
+                mock_db, org_id, new_plan_id, "monthly", True
+            )
 
-                    assert updated_sub.plan_id == new_plan_id
-                    mock_update_quotas.assert_called_once()
+            assert updated_sub.plan_id == new_plan_id
+            mock_update_quotas.assert_called_once()
 
     async def test_upgrade_subscription_no_subscription(self, mock_db):
         """Test upgrade fails when subscription doesn't exist."""
@@ -279,8 +277,8 @@ class TestSubscriptionUpgrade:
             stripe_subscription_id="sub_test_123",
             stripe_customer_id="cus_test_123",
             status="active",
-            current_period_start=datetime.now(timezone.utc),
-            current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
+            current_period_start=datetime.now(UTC),
+            current_period_end=datetime.now(UTC) + timedelta(days=30),
         )
 
         def mock_execute_side_effect(*args, **kwargs):
@@ -318,8 +316,8 @@ class TestSubscriptionCancellation:
             stripe_subscription_id="sub_test_123",
             stripe_customer_id="cus_test_123",
             status="active",
-            current_period_start=datetime.now(timezone.utc),
-            current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
+            current_period_start=datetime.now(UTC),
+            current_period_end=datetime.now(UTC) + timedelta(days=30),
         )
 
         mock_result = MagicMock()
@@ -329,17 +327,16 @@ class TestSubscriptionCancellation:
         with patch(
             "app.services.stripe_service.StripeService.cancel_subscription",
             new=AsyncMock(return_value=MagicMock()),
+        ), patch.object(
+            BillingService,
+            "update_subscription_from_stripe",
+            new=AsyncMock(return_value=subscription),
         ):
-            with patch.object(
-                BillingService,
-                "update_subscription_from_stripe",
-                new=AsyncMock(return_value=subscription),
-            ):
-                canceled_sub = await BillingService.cancel_subscription(
-                    mock_db, org_id, immediately=True
-                )
+            canceled_sub = await BillingService.cancel_subscription(
+                mock_db, org_id, immediately=True
+            )
 
-                assert canceled_sub == subscription
+            assert canceled_sub == subscription
 
     async def test_cancel_subscription_at_period_end(self, mock_db):
         """Test cancellation at period end."""
@@ -353,8 +350,8 @@ class TestSubscriptionCancellation:
             stripe_customer_id="cus_test_123",
             status="active",
             cancel_at_period_end=False,
-            current_period_start=datetime.now(timezone.utc),
-            current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
+            current_period_start=datetime.now(UTC),
+            current_period_end=datetime.now(UTC) + timedelta(days=30),
         )
 
         mock_result = MagicMock()
@@ -364,15 +361,14 @@ class TestSubscriptionCancellation:
         with patch(
             "app.services.stripe_service.StripeService.cancel_subscription",
             new=AsyncMock(return_value=MagicMock(cancel_at_period_end=True)),
+        ), patch.object(
+            BillingService,
+            "update_subscription_from_stripe",
+            new=AsyncMock(return_value=subscription),
         ):
-            with patch.object(
-                BillingService,
-                "update_subscription_from_stripe",
-                new=AsyncMock(return_value=subscription),
-            ):
-                await BillingService.cancel_subscription(
-                    mock_db, org_id, immediately=False
-                )
+            await BillingService.cancel_subscription(
+                mock_db, org_id, immediately=False
+            )
 
 
 @pytest.mark.asyncio

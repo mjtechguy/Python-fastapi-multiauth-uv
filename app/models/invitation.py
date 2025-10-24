@@ -2,7 +2,7 @@
 
 import secrets
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String
@@ -12,8 +12,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.organization import Organization
+    from app.models.user import User
 
 
 class Invitation(Base):
@@ -55,7 +55,7 @@ class Invitation(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
 
     # Relationships
@@ -82,14 +82,14 @@ class Invitation(Base):
             inviter_id=inviter_id,
             email=email,
             token=cls.generate_token(),
-            expires_at=datetime.now(timezone.utc) + timedelta(days=expires_in_days),
+            expires_at=datetime.now(UTC) + timedelta(days=expires_in_days),
         )
 
     def is_valid(self) -> bool:
         """Check if invitation is still valid."""
         return (
             not self.is_accepted
-            and self.expires_at > datetime.now(timezone.utc)
+            and self.expires_at > datetime.now(UTC)
         )
 
     def __repr__(self) -> str:

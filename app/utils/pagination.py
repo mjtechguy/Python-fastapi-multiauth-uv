@@ -1,7 +1,7 @@
 """Pagination utilities for consistent API responses."""
 
-from typing import Generic, TypeVar
 from math import ceil
+from typing import TypeVar
 
 from pydantic import BaseModel
 
@@ -25,7 +25,7 @@ class PageParams(BaseModel):
         return self.page_size
 
 
-class PageResponse(BaseModel, Generic[T]):
+class PageResponse[T](BaseModel):
     """Generic paginated response."""
 
     items: list[T]

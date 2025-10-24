@@ -1,6 +1,6 @@
 """WebSocket connection manager."""
 
-from typing import Dict
+
 from fastapi import WebSocket
 
 
@@ -9,7 +9,7 @@ class WebSocketManager:
 
     def __init__(self):
         """Initialize WebSocket manager."""
-        self.active_connections: Dict[str, WebSocket] = {}
+        self.active_connections: dict[str, WebSocket] = {}
 
     async def connect(self, websocket: WebSocket, user_id: str) -> None:
         """

@@ -210,8 +210,8 @@ class TestTeamMembers:
         team_id = create_response.json()["id"]
 
         # Create another user and add to organization
-        from app.models.user import User
         from app.core.security import get_password_hash
+        from app.models.user import User
 
         new_user = User(
             email="teammember@example.com",
@@ -251,8 +251,8 @@ class TestTeamMembers:
         team_id = create_response.json()["id"]
 
         # Create and add user to org
-        from app.models.user import User
         from app.core.security import get_password_hash
+        from app.models.user import User
         from app.services.organization import OrganizationService
 
         user = User(
@@ -318,8 +318,8 @@ class TestTeamMembers:
         team_id = create_response.json()["id"]
 
         # Create user but don't add to organization
-        from app.models.user import User
         from app.core.security import get_password_hash
+        from app.models.user import User
 
         user = User(
             email="notinorg@example.com",
@@ -354,8 +354,8 @@ class TestTeamMembers:
         team_id = create_response.json()["id"]
 
         # Create and add user to org and team
-        from app.models.user import User
         from app.core.security import get_password_hash
+        from app.models.user import User
         from app.services.organization import OrganizationService
 
         user = User(
@@ -417,8 +417,8 @@ class TestTeamMembers:
         team_id = create_response.json()["id"]
 
         # Add a member
-        from app.models.user import User
         from app.core.security import get_password_hash
+        from app.models.user import User
         from app.services.organization import OrganizationService
 
         user = User(

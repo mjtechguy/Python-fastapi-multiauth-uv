@@ -1,15 +1,14 @@
 """Quota checking dependencies for API endpoints."""
 
-import uuid
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
 from app.api.v1.dependencies import get_current_user
-from app.models.user import User
+from app.db.session import get_db
 from app.models.quota import OrganizationQuota
+from app.models.user import User
 from app.services.quota import QuotaService
 
 

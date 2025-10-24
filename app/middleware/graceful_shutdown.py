@@ -51,8 +51,7 @@ class GracefulShutdownMiddleware(BaseHTTPMiddleware):
         )
 
         try:
-            response = await call_next(request)
-            return response
+            return await call_next(request)
         finally:
             # Decrement active request counter
             shutdown_handler.active_requests -= 1

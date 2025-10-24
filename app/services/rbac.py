@@ -2,13 +2,13 @@
 
 from uuid import UUID
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.role import Role, Permission, RolePermission
+from app.models.role import Permission, Role, RolePermission
 from app.models.user import User, user_roles
-from app.schemas.role import RoleCreate, RoleUpdate, PermissionCreate
+from app.schemas.role import PermissionCreate, RoleCreate, RoleUpdate
 
 
 class RBACService:
@@ -274,7 +274,7 @@ class RBACService:
         # Get all permissions
         result = await db.execute(select(Permission))
         all_permissions = result.scalars().all()
-        permission_map = {p.name: p for p in all_permissions}
+        {p.name: p for p in all_permissions}
 
         # Admin role with all permissions
         admin_role = await RBACService.get_role_by_name(db, "admin")

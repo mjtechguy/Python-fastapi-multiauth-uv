@@ -1,25 +1,25 @@
 """Main FastAPI application."""
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.exceptions import BaseAPIException
+from app.core.graceful_shutdown import shutdown_handler
 from app.core.logging_config import configure_logging, get_logger
-from app.middleware.security import SecurityHeadersMiddleware
+from app.middleware.graceful_shutdown import GracefulShutdownMiddleware
+from app.middleware.logging import LoggingMiddleware
 from app.middleware.rate_limit import limiter
 from app.middleware.request_id import RequestIDMiddleware
-from app.middleware.logging import LoggingMiddleware
-from app.middleware.graceful_shutdown import GracefulShutdownMiddleware
-from app.core.graceful_shutdown import shutdown_handler
+from app.middleware.security import SecurityHeadersMiddleware
 
 # Configure structured logging FIRST (before any logging occurs)
 configure_logging()
@@ -64,7 +64,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize database tables
     from app.db.session import Base, async_engine
-    import app.models  # Import all models to register them with Base
 
     async with async_engine.begin() as conn:
         # Create all tables

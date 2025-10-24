@@ -1,4 +1,4 @@
-# SaaS Backend Framework
+# FastAPI Super SaaS Boilerplate
 
 A **production-grade**, **enterprise-ready** FastAPI backend framework designed for scalable SaaS applications with comprehensive authentication, multi-tenancy, real-time features, and cloud-native deployment support.
 
@@ -6,6 +6,14 @@ A **production-grade**, **enterprise-ready** FastAPI backend framework designed 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-blue.svg)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+## Project Note
+
+This project was carefully crafted in conjunction with [Claude Code](https://github.com/anthropics/claude-code) and [Sonnet 4.5](https://www.anthropic.com/claude/sonnet). Claude was prompted and guided throughout the process and wrote almost 100% of the code. This project serves as a demonstration of Claude Code's capabilities in generating complex, production grade software based on detailed specifications.
+
+That being said, this project is considered **Alpha** software. While every effort has been made to ensure code quality and security, it has not yet undergone extensive real-world testing. Users should exercise caution and conduct their own code reviews before deploying in production environments.
+
+We believe that AI-assisted development represents the future of software engineering, and this project is an early example of that vision in action. We welcome feedback and contributions from the community to help improve and mature this framework over time.
 
 ## ✨ Features
 
@@ -287,9 +295,12 @@ See [traefik/README.md](traefik/README.md) for complete setup guide.
 │   │           ├── auth.py          # Authentication
 │   │           ├── totp.py          # 2FA/TOTP
 │   │           ├── sessions.py      # Session management
+│   │           ├── billing.py       # Stripe billing & subscriptions
+│   │           ├── stripe_webhooks.py # Stripe webhook handler
 │   │           ├── files.py         # File upload/management
 │   │           ├── users.py         # User management
 │   │           ├── organizations.py # Multi-tenancy
+│   │           ├── teams.py         # Team management
 │   │           ├── quota.py         # Usage quotas
 │   │           ├── webhooks.py      # Webhook management
 │   │           ├── dead_letter.py   # DLQ monitoring
@@ -312,6 +323,7 @@ See [traefik/README.md](traefik/README.md) for complete setup guide.
 │   │   ├── session.py              # User sessions
 │   │   ├── file.py                 # File metadata
 │   │   ├── organization.py         # Organizations
+│   │   ├── team.py                 # Teams
 │   │   ├── role.py                 # RBAC
 │   │   ├── notification.py         # Notifications
 │   │   ├── invitation.py           # Invitations
@@ -319,7 +331,12 @@ See [traefik/README.md](traefik/README.md) for complete setup guide.
 │   │   ├── token.py                # Email/password reset tokens
 │   │   ├── quota.py                # Usage quotas
 │   │   ├── webhook.py              # Webhooks
-│   │   └── dead_letter.py          # DLQ tasks
+│   │   ├── dead_letter.py          # DLQ tasks
+│   │   ├── subscription.py         # Billing subscriptions
+│   │   ├── subscription_plan.py    # Subscription plans
+│   │   ├── payment_method.py       # Payment methods
+│   │   ├── invoice.py              # Billing invoices
+│   │   └── billing_event.py        # Billing audit log
 │   ├── repositories/                # Data access layer
 │   │   ├── base.py                 # Generic CRUD
 │   │   └── user_repository.py      # User-specific queries
@@ -328,6 +345,8 @@ See [traefik/README.md](traefik/README.md) for complete setup guide.
 │   │   ├── auth.py                 # Authentication
 │   │   ├── totp.py                 # 2FA operations
 │   │   ├── session.py              # Session management
+│   │   ├── stripe_service.py       # Stripe API wrapper
+│   │   ├── billing.py              # Billing business logic
 │   │   ├── storage.py              # File storage (S3/local)
 │   │   ├── cache.py                # Redis caching
 │   │   ├── rbac.py                 # Permissions
@@ -463,6 +482,8 @@ See [traefik/README.md](traefik/README.md) for complete setup guide.
 | `PUT` | `/api/v1/users/me/password` | Change password |
 | `GET` | `/api/v1/users` | List users (admin) |
 | `GET` | `/api/v1/users/{user_id}` | Get user by ID |
+| `POST` | `/api/v1/users/{user_id}/superuser` | Grant global admin status (admin) |
+| `DELETE` | `/api/v1/users/{user_id}/superuser` | Revoke global admin status (admin) |
 | `DELETE` | `/api/v1/users/{user_id}` | Delete user (admin) |
 
 ### Organizations (Multi-Tenancy)
@@ -474,8 +495,41 @@ See [traefik/README.md](traefik/README.md) for complete setup guide.
 | `GET` | `/api/v1/organizations/{org_id}` | Get organization details |
 | `PUT` | `/api/v1/organizations/{org_id}` | Update organization |
 | `DELETE` | `/api/v1/organizations/{org_id}` | Delete organization |
+| `GET` | `/api/v1/organizations/{org_id}/members` | List organization members |
 | `POST` | `/api/v1/organizations/{org_id}/members` | Add member |
-| `DELETE` | `/api/v1/organizations/{org_id}/members/{user_id}` | Remove member |
+| `DELETE` | `/api/v1/organizations/{org_id}/members` | Remove member |
+
+### Teams
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/teams` | Create team |
+| `GET` | `/api/v1/teams` | List teams in organization |
+| `GET` | `/api/v1/teams/{team_id}` | Get team details |
+| `PUT` | `/api/v1/teams/{team_id}` | Update team |
+| `DELETE` | `/api/v1/teams/{team_id}` | Delete team |
+| `GET` | `/api/v1/teams/{team_id}/members` | List team members |
+| `POST` | `/api/v1/teams/{team_id}/members` | Add team member |
+| `DELETE` | `/api/v1/teams/{team_id}/members` | Remove team member |
+
+### Billing & Subscriptions
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/billing/plans` | List all subscription plans |
+| `GET` | `/api/v1/billing/subscription` | Get current organization subscription |
+| `POST` | `/api/v1/billing/checkout` | Create Stripe checkout session |
+| `POST` | `/api/v1/billing/subscription/upgrade` | Upgrade/downgrade subscription plan |
+| `POST` | `/api/v1/billing/subscription/cancel` | Cancel subscription (at period end) |
+| `POST` | `/api/v1/billing/subscription/resume` | Resume cancelled subscription |
+| `GET` | `/api/v1/billing/payment-methods` | List payment methods |
+| `POST` | `/api/v1/billing/payment-methods` | Add payment method |
+| `DELETE` | `/api/v1/billing/payment-methods/{id}` | Remove payment method |
+| `PUT` | `/api/v1/billing/payment-methods/{id}/default` | Set default payment method |
+| `GET` | `/api/v1/billing/invoices` | List invoices (paginated) |
+| `GET` | `/api/v1/billing/invoices/{id}` | Get invoice details |
+| `POST` | `/api/v1/billing/portal` | Create Stripe Customer Portal session |
+| `GET` | `/api/v1/billing/usage` | Get current billing period usage |
 
 ### Real-Time (WebSocket)
 
@@ -503,6 +557,25 @@ See [traefik/README.md](traefik/README.md) for complete setup guide.
 | `DELETE` | `/api/v1/webhooks/{id}` | Delete webhook |
 | `POST` | `/api/v1/webhooks/{id}/test` | Test webhook delivery |
 | `GET` | `/api/v1/webhooks/{id}/deliveries` | Get delivery history |
+
+### Stripe Webhooks
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/webhooks/stripe` | Stripe webhook handler (signature verification) |
+
+**Supported Stripe Events:**
+- `customer.subscription.created` - New subscription created
+- `customer.subscription.updated` - Subscription updated
+- `customer.subscription.deleted` - Subscription cancelled/expired
+- `customer.subscription.trial_will_end` - Trial ending soon (3 days)
+- `invoice.payment_succeeded` - Successful payment
+- `invoice.payment_failed` - Failed payment
+- `invoice.created` - Invoice created
+- `invoice.finalized` - Invoice finalized
+- `invoice.updated` - Invoice updated
+- `payment_method.attached` - Payment method added
+- `payment_method.detached` - Payment method removed
 
 ### Dead Letter Queue (DLQ)
 
@@ -538,7 +611,7 @@ Key configuration options (see `.env.example` for complete list):
 
 ```env
 # Application
-APP_NAME=SaaS Backend Framework
+APP_NAME=FastAPI Super SaaS Boilerplate
 APP_ENV=development
 SECRET_KEY=your-secret-key-min-32-chars
 
@@ -888,6 +961,7 @@ asyncio.run(test_websocket())
 - **PostgreSQL 16** - Primary database
 - **Redis 7** - Caching and message broker
 - **Celery** - Distributed task queue
+- **Stripe** - Payment processing and subscription management
 - **Boto3** - AWS S3 integration
 - **PyOTP** - TOTP 2FA implementation
 

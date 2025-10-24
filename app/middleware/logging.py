@@ -1,7 +1,6 @@
 """Logging middleware for request context and correlation."""
 
 import time
-from typing import Callable
 
 import structlog
 from fastapi import Request, Response

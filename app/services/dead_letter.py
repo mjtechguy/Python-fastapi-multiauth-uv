@@ -1,10 +1,9 @@
 """Service for managing dead letter queue."""
 
-import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.dead_letter import DeadLetterTask
@@ -91,7 +90,7 @@ class DeadLetterService:
         task.status = "resolved"
         task.resolution_notes = resolution_notes
         task.resolved_by = resolved_by
-        task.resolved_at = datetime.now(timezone.utc)
+        task.resolved_at = datetime.now(UTC)
 
         await db.commit()
         await db.refresh(task)
@@ -147,7 +146,7 @@ class DeadLetterService:
         # Recent failures (last 24 hours)
         recent_result = await db.execute(
             select(func.count(DeadLetterTask.id))
-            .where(DeadLetterTask.failed_at >= datetime.now(timezone.utc) - timedelta(hours=24))
+            .where(DeadLetterTask.failed_at >= datetime.now(UTC) - timedelta(hours=24))
         )
         recent = recent_result.scalar_one()
 

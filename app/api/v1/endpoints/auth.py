@@ -6,27 +6,26 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_user
-from app.core.security import create_access_token
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
-    Token,
     LoginRequest,
-    RefreshTokenRequest,
     OAuthCallback,
     OAuthURLResponse,
+    RefreshTokenRequest,
+    Token,
 )
-from app.schemas.user import UserCreate, UserResponse
 from app.schemas.token import (
     RequestPasswordResetRequest,
     RequestPasswordResetResponse,
+    ResendVerificationRequest,
+    ResendVerificationResponse,
     ResetPasswordRequest,
     ResetPasswordResponse,
     VerifyEmailRequest,
     VerifyEmailResponse,
-    ResendVerificationRequest,
-    ResendVerificationResponse,
 )
+from app.schemas.user import UserCreate, UserResponse
 from app.services.auth import AuthService
 from app.services.user import UserService
 
@@ -72,7 +71,7 @@ async def register(
     await db.flush()
 
     # Check if this is the first user - make them superuser (global admin)
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
 
     user_count = await db.execute(select(func.count(User.id)))
     total_users = user_count.scalar_one()
@@ -210,6 +209,7 @@ async def oauth_authorize(provider: str) -> OAuthURLResponse:
         HTTPException: If provider is not supported
     """
     import secrets
+
     from app.services.cache import cache
 
     try:
@@ -261,8 +261,8 @@ async def oauth_callback(
     Raises:
         HTTPException: If state validation fails or authentication fails
     """
-    from app.services.cache import cache
     from app.core.logging_config import get_logger
+    from app.services.cache import cache
 
     logger = get_logger(__name__)
 
@@ -360,8 +360,6 @@ async def request_password_reset(
     Returns:
         Success message
     """
-    from datetime import datetime
-    from sqlalchemy import select
     from app.models.token import PasswordResetToken
     from app.tasks.email import send_password_reset_email
 
@@ -408,8 +406,9 @@ async def reset_password(
         HTTPException: If token is invalid or expired
     """
     from sqlalchemy import select
-    from app.models.token import PasswordResetToken
+
     from app.core.security import get_password_hash
+    from app.models.token import PasswordResetToken
 
     # Find token
     result = await db.execute(
@@ -463,6 +462,7 @@ async def verify_email(
         HTTPException: If token is invalid or expired
     """
     from sqlalchemy import select
+
     from app.models.token import EmailVerificationToken
 
     # Find token
@@ -511,7 +511,6 @@ async def resend_verification(
     Returns:
         Success message
     """
-    from sqlalchemy import select
     from app.models.token import EmailVerificationToken
     from app.tasks.email import send_verification_email
 

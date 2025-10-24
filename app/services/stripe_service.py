@@ -1,12 +1,11 @@
 """Stripe service for payment processing."""
 
-import stripe
-from datetime import datetime, timezone
 from typing import Any
+
+import stripe
 
 from app.core.config import settings
 from app.core.logging_config import logger
-
 
 # Initialize Stripe with API key
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -564,8 +563,7 @@ class StripeService:
             stripe.error.SignatureVerificationError: Invalid signature
         """
         try:
-            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-            return event
+            return stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
 
         except ValueError as e:
             logger.error("Invalid webhook payload", extra={"error": str(e)})

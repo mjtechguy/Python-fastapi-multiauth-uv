@@ -1,17 +1,17 @@
 """Pytest configuration and fixtures."""
 
 import asyncio
-from typing import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
-from app.core.config import settings
 
 # Test database URL (use separate test database)
 TEST_DATABASE_URL = str(settings.DATABASE_URL).replace("saas_db", "saas_test_db")
@@ -25,7 +25,7 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     loop.close()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def db_engine():
     """Create test database engine."""
     engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
@@ -41,7 +41,7 @@ async def db_engine():
     await engine.dispose()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
     """Create database session for tests."""
     async_session = async_sessionmaker(
@@ -52,7 +52,7 @@ async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create test client."""
 
@@ -70,8 +70,8 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 @pytest.fixture
 async def test_user(db_session: AsyncSession):
     """Create a test user."""
-    from app.models.user import User
     from app.core.security import get_password_hash
+    from app.models.user import User
 
     user = User(
         email="test@example.com",
@@ -90,8 +90,8 @@ async def test_user(db_session: AsyncSession):
 @pytest.fixture
 async def test_superuser(db_session: AsyncSession):
     """Create a test superuser."""
-    from app.models.user import User
     from app.core.security import get_password_hash
+    from app.models.user import User
 
     user = User(
         email="admin@example.com",

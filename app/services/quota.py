@@ -1,14 +1,13 @@
 """Quota service for usage tracking and enforcement."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.quota import OrganizationQuota, UsageLog
-from app.models.organization import Organization
 from app.models.subscription import Subscription
 
 
@@ -95,7 +94,7 @@ class QuotaService:
             ) > quota.max_storage_bytes:
                 return (
                     False,
-                    f"Storage limit reached. Please upgrade your plan for more storage.",
+                    "Storage limit reached. Please upgrade your plan for more storage.",
                 )
 
         elif quota_type == "api_calls":
@@ -153,7 +152,7 @@ class QuotaService:
         db: AsyncSession, quota: OrganizationQuota
     ) -> OrganizationQuota:
         """Reset monthly quotas if needed."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Reset if more than 30 days have passed
         if (now - quota.api_calls_reset_at).days >= 30:
             quota.current_api_calls_this_month = 0
@@ -167,7 +166,7 @@ class QuotaService:
         db: AsyncSession, quota: OrganizationQuota
     ) -> OrganizationQuota:
         """Reset daily quotas if needed."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Reset if more than 1 day has passed
         if (now - quota.file_uploads_reset_at).days >= 1:
             quota.current_file_uploads_today = 0

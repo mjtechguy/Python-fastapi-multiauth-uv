@@ -9,11 +9,11 @@ from app.api.v1.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.dead_letter import (
-    DeadLetterTaskResponse,
-    DeadLetterTaskListResponse,
-    ResolveDeadLetterTaskRequest,
-    IgnoreDeadLetterTaskRequest,
     DeadLetterStatisticsResponse,
+    DeadLetterTaskListResponse,
+    DeadLetterTaskResponse,
+    IgnoreDeadLetterTaskRequest,
+    ResolveDeadLetterTaskRequest,
 )
 from app.services.dead_letter import DeadLetterService
 
@@ -78,10 +78,9 @@ async def resolve_dead_letter_task(
     """Mark a dead letter task as resolved."""
     # TODO: Add admin permission check
     try:
-        task = await DeadLetterService.resolve_dead_letter_task(
+        return await DeadLetterService.resolve_dead_letter_task(
             db, task_id, request.resolution_notes, request.resolved_by
         )
-        return task
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -95,9 +94,8 @@ async def retry_dead_letter_task(
     """Retry a dead letter task."""
     # TODO: Add admin permission check
     try:
-        task = await DeadLetterService.retry_dead_letter_task(db, task_id)
+        return await DeadLetterService.retry_dead_letter_task(db, task_id)
         # TODO: Re-queue the task to Celery
-        return task
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -112,7 +110,6 @@ async def ignore_dead_letter_task(
     """Mark a dead letter task as ignored."""
     # TODO: Add admin permission check
     try:
-        task = await DeadLetterService.ignore_dead_letter_task(db, task_id, request.notes)
-        return task
+        return await DeadLetterService.ignore_dead_letter_task(db, task_id, request.notes)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

@@ -4,13 +4,11 @@ import hashlib
 import os
 import uuid
 from pathlib import Path
-from typing import BinaryIO, Tuple
+from typing import BinaryIO
 
 import boto3
 from botocore.exceptions import ClientError
 from PIL import Image
-
-from app.core.config import settings
 
 
 class StorageService:
@@ -18,7 +16,7 @@ class StorageService:
 
     async def upload(
         self, file: BinaryIO, filename: str, content_type: str, org_id: str | None = None, user_id: str | None = None
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """
         Upload file to storage.
 
@@ -101,7 +99,7 @@ class S3StorageService(StorageService):
 
     async def upload(
         self, file: BinaryIO, filename: str, content_type: str, org_id: str | None = None, user_id: str | None = None
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Upload file to S3 with optional organization/user path."""
         # Generate unique S3 key with org/user path structure
         file_ext = Path(filename).suffix
@@ -153,12 +151,11 @@ class S3StorageService(StorageService):
     ) -> str:
         """Get presigned URL for S3 object."""
         try:
-            url = self.s3_client.generate_presigned_url(
+            return self.s3_client.generate_presigned_url(
                 "get_object",
                 Params={"Bucket": self.bucket_name, "Key": storage_path},
                 ExpiresIn=expiration,
             )
-            return url
 
         except ClientError as e:
             raise Exception(f"Failed to generate presigned URL: {e}")
@@ -174,7 +171,7 @@ class LocalStorageService(StorageService):
 
     async def upload(
         self, file: BinaryIO, filename: str, content_type: str, org_id: str | None = None, user_id: str | None = None
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Upload file to local filesystem with optional organization/user path."""
         # Generate unique filename
         file_ext = Path(filename).suffix
@@ -318,7 +315,7 @@ class FileStorageService:
 
     async def upload(
         self, file: BinaryIO, filename: str, content_type: str, org_id: str | None = None, user_id: str | None = None
-    ) -> Tuple[str, str, str]:
+    ) -> tuple[str, str, str]:
         """
         Upload file to storage.
 

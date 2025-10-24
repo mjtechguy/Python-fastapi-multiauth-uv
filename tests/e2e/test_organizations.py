@@ -101,8 +101,8 @@ class TestOrganizationMembers:
     async def test_add_member_to_organization(self, authenticated_client: AsyncClient, test_organization: dict, client: AsyncClient, db_session):
         """Test adding a member to an organization."""
         # Create another user to add as member
-        from app.models.user import User
         from app.core.security import get_password_hash
+        from app.models.user import User
 
         new_user = User(
             email="newmember@example.com",
@@ -131,8 +131,8 @@ class TestOrganizationMembers:
     async def test_add_member_with_admin_role(self, authenticated_client: AsyncClient, test_organization: dict, client: AsyncClient, db_session):
         """Test adding a member with admin role."""
         # Create another user
-        from app.models.user import User
         from app.core.security import get_password_hash
+        from app.models.user import User
 
         new_user = User(
             email="adminmember@example.com",
@@ -175,8 +175,8 @@ class TestOrganizationMembers:
     async def test_add_member_to_nonexistent_organization(self, authenticated_client: AsyncClient, db_session):
         """Test adding member to non-existent organization."""
         # Create a user
-        from app.models.user import User
         from app.core.security import get_password_hash
+        from app.models.user import User
 
         user = User(
             email="orphanmember@example.com",
@@ -205,8 +205,8 @@ class TestOrganizationMembers:
     async def test_remove_member_from_organization(self, authenticated_client: AsyncClient, test_organization: dict, db_session):
         """Test removing a member from an organization."""
         # Create and add a user first
-        from app.models.user import User
         from app.core.security import get_password_hash
+        from app.models.user import User
 
         user_to_remove = User(
             email="removeme@example.com",

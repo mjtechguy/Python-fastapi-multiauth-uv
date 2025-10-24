@@ -1,9 +1,9 @@
 """Base repository for common database operations."""
 
-from typing import Generic, TypeVar, Type, Any
+from typing import Any, TypeVar
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import Base
@@ -11,10 +11,10 @@ from app.db.session import Base
 ModelType = TypeVar("ModelType", bound=Base)
 
 
-class BaseRepository(Generic[ModelType]):
+class BaseRepository[ModelType: Base]:
     """Base repository with common CRUD operations."""
 
-    def __init__(self, model: Type[ModelType], db: AsyncSession):
+    def __init__(self, model: type[ModelType], db: AsyncSession):
         """
         Initialize repository.
 

@@ -2,7 +2,7 @@
 
 import asyncio
 import signal
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from app.core.logging_config import get_logger
 

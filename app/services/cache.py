@@ -1,10 +1,12 @@
 """Caching service for Redis-based caching."""
 
 import json
-from typing import Any, Callable
+from collections.abc import Callable
 from functools import wraps
+from typing import Any
 
 import redis.asyncio as aioredis
+
 from app.core.config import settings
 
 
@@ -98,7 +100,7 @@ def cached(expire: int = 300, key_prefix: str = ""):
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             # Generate cache key from function name and arguments
-            cache_key = f"{key_prefix}:{func.__name__}:{str(args)}:{str(kwargs)}"
+            cache_key = f"{key_prefix}:{func.__name__}:{args!s}:{kwargs!s}"
 
             # Try to get from cache
             cached_result = await cache.get(cache_key)
